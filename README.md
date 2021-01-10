@@ -39,7 +39,7 @@ Kermit-180 has been tested on a P112 (Z180) machine running RSX180 and on a Z280
 |Printer control|No|
 
 ## Quick start guide
-1. Start Kermit at the PC and setup it accordingly, the following settings were used with C-Kermit 9.0.302 under Linux:  
+1. Start Kermit at the PC side and setup it accordingly, the following settings were used with C-Kermit 9.0.302 under Linux:  
 `set line /dev/ttyUSB1`   (or whatever line your machine is connected to)  
 `set speed 19200` (this is the default for the Z280RC quad-serial board under RSX280)  
 `set attributes off`  
