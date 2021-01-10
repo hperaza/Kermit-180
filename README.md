@@ -52,13 +52,13 @@ To avoid having to type the above commands every time, you can save them into a 
 2. Start Kermit-180 on the RSX180/280 side:  
 `run $kermit` (if Kermit-180 is not installed)  
 `ker` (if Kermit-180 is installed as ...KER)  
-Once is running, setup the communication parameters. The following settings were used on a Z280RC running RSX280:  
+Once it is running, setup the communication parameters. The following settings were used on a Z280RC running RSX280:  
 `set line tt3:` (or whatever line the Z280RC is connected to the PC)  
 `set parity space` (or `set parity none`, but must match the PC settings above)  
 `set file-mode binary`  
 As with the PC Kermit, you can save the above command sequence into a text file for later execution via the `take` command. If you name the file `kermit.ini` and place it into your user's directory, Kermit-180 will execute it automatically on startup.
 
-4. You can now use the `send`command on the PC side and the `get` command on the RSX280 side to transfer a file from the PC to the Z280RC. Do the opposite to send a file from the Z280RC to the PC.
+4. You can now use the `send` command on the PC side and the `get` command on the RSX280 side to transfer a file from the PC to the Z280RC. Do the opposite to send a file from the Z280RC to the PC.
 
 5. Best is just to put the PC Kermit in `server` mode. Then, you can send and receive files by only entering commands at RSX180/280 terminal. E.g.  
 `send examp.cmd` to send a file to the PC  
