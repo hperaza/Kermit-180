@@ -47,6 +47,9 @@ Kermit-180 has been tested on a P112 (Z180) machine running RSX180 and on a Z280
 `set file type binary`  
 `set carrier-watch off`  
 `set flow-control none`  
+`set control-character prefixed all`  
+`set file patterns off`  
+`set transfer mode manual`  
 To avoid having to type the above commands every time, you can save them into a text file and then use the Kermit's `take` command to execute them.
 
 2. Start Kermit-180 on the RSX180/280 side:  
@@ -75,4 +78,14 @@ Also, the current version of Kermit-180 is built by default as a privileged task
 The filename completion (e.g. for DIR or ERA commands) is not working fully correctly yet: pressing ESC or TAB a second time appends part of the file extension again to the completed file name, etc.
 
 When using C-Kermit 9.0 on Linux, a file transfer from the PC to the Z280RC sometimes stalls and then aborts with a "Too many retries" error. Usually restarting the transfer fixes the problem, but it can get stubborn stopping at approximately the same spot over and over. The older C-Kermit 5A(190) does not show the problem.
+
+_Update:_ the problem was traced back to C-Kermit taking certain liberties with
+the Kermit protocol: specifically, not prefixing all control characters like it
+should.  The `set control-character prefixed all` fixes the problem.  Also,
+I'd recommend to use `set file patterns off` and `set transfer mode manual`
+as well, otherwise C-Kermit will try to switch automatically to ascii mode
+when transferring text files in binary mode without Kermit-180 being aware of
+the change. The result is a text file with duplicated carriage return characters
+being received at the RSX180/280 side if the file at the PC side already had
+CR/LF line endings.
 
