@@ -2,24 +2,28 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
-;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
 ;       This file contains the (system-independent) routines that implement
 ;       the REMOTE commands of the KERMIT protocol.
 ;
-; Revision history:
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
+;
+; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 13, 21-Mar-1991 by MF. Renamed REMOTE SET FILE COLLISION REPLACE to
 ;	REMOTE SET FILE COLLISION OVERWRITE and modified the corresponding
@@ -115,7 +119,7 @@
 
 	cseg
 
-REMVER:	defb	'KREM (13) 27-Dec-2020',0	; name, edit number, date
+REMVER:	defb	'KREM (14) 31-Dec-2020',0	; name, edit number, date
 
 ;  REMOTE command - quite similar to the SET command
 

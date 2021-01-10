@@ -1,23 +1,29 @@
+; KDEF.INC
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984,1985
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       This file contains definitions used by all the other modules of
+;       Kermit.
 ;
-;       This file contains definitions used by both modules of Kermit.
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
 ;
-; revision history:
+; edit 10, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 9, 30-Nov-1990 by MF. Make "fairness" count "prfair" be 50 so
 ;	console gets checked a bit more often.

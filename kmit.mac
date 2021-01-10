@@ -2,26 +2,29 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984,1985
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
-;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
 ;       This file contains the system-independent initialization, the main
 ;       loop, and the commands that don't have any place better to go.
-;	All the SET xxx and status routines now in KCOM.MAC as KMIT.MAC
-;	was getting too big.
+;	All the SET xxx and status routines now in KCOM.MAC.
 ;
-; Revision history:
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
+;
+; edit 31, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 30, 29-Mar-1991 by MF. When looking up a TAKE-file in a TAKE command
 ;	and the file is not found, complain if it's not the first TAKE of
@@ -266,7 +269,7 @@
 
 	cseg
 
-MITVER:	defb	'KMIT (30) 27-Dec-2020',0	; name, edit number, date
+MITVER:	defb	'KMIT (31) 27-Dec-2020',0	; name, edit number, date
 
 ; Initialization
 

@@ -2,25 +2,28 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984,1985
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
-;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
 ;       This file contains some of the main loop commands, all SET xxx and
-;	status routines.  File split from KMIT.INC as that file 
-;	was getting too big.
+;       status routines.
 ;
-; Revision history:
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
+;
+; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 13, 25-Mar-1991 by MF. Require confirmation if a STAY command
 ;	(code at "noexit") is given and a question-mark is entered.
@@ -128,7 +131,7 @@
 
 	cseg
 
-COMVER:	defb	'KCOM (13) 27-Dec-2020',0	; name, edit no. and date
+COMVER:	defb	'KCOM (14) 27-Dec-2020',0	; name, edit no. and date
 
 ; This is the SET command.
 

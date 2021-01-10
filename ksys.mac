@@ -2,24 +2,28 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
-;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
 ;       This file constains mostly RSX180-specific routines, and also
 ;	implements the DIRECTORY, ERASE, RENAME and COPY commands.
 ;
-; revision history:
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
+;
+; edit 15, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 14, 1-Apr-1991 by MF. Correct a bug which crept in with edit 13 which
 ;	caused any control-key other than ^Y or ^Z to act like ^X after a key
@@ -159,7 +163,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (14) 06-Jan-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (15) 06-Jan-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.

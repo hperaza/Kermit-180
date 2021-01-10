@@ -2,23 +2,27 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol.
+;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
 ;
 ;       Version 4.0
 ;
-;       Copyright June 1981,1982,1983,1984,1985
-;       Columbia University
+; Derived from Kermit-80, originally written by Bill Catchings of the
+; Columbia University Center for Computing Activities, 612 W. 115th St.,
+; New York, NY 10025. with contributions by Frank da Cruz, Daphne Tzoar,
+; Bernie Eiben, Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen,
+; Jeff Damens, and many others. 
 ;
-; Originally written by Bill Catchings of the Columbia University Center for
-; Computing Activities, 612 W. 115th St., New York, NY 10025.
+;       Copyright June 1981,1982,1983,1984,1985 Columbia University
 ;
-; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
-; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
-; others. 
+;       Pure and impure data areas.
 ;
-;       Pure and impure data areas. Previously of KUTL.INC
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Revision history (latest first):
 ;
-; Revision history:
+; edit 20, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;
+; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+; Old Kermit-80 4.11 revision history:
 ;
 ; edit 19, 29-Mar-1991 by MF. Add flag "initak" (nonzero) which is cleared
 ;	after the initial automatic TAKE attempt of KERMIT.INI to allow
@@ -118,7 +122,7 @@
 
 	dseg
 
-DATVER:	defb	'KDAT (19) 27-Dec-2020',0
+DATVER:	defb	'KDAT (20) 27-Dec-2020',0
 
 	page
 
