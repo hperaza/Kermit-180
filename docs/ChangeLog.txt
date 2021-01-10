@@ -1,0 +1,171 @@
+Changelog
+---------
+
+Using Kermit-80 4.11 as the base version.
+
+
+27/12/20
+
+- Code converted to Z80.
+
+- Replaced call to MOVER routine by Z80 LDIR instruction.
+
+- Null char now marks the end of strings, so we can use SYSLIB routines.
+
+
+28/12/20
+
+- Kermit modules are now assembled separately, with split code and data
+  segments and no longer as a monolithic block in an absolute segment
+  (easier to link/test different versions of the modules).
+
+
+30/12/20
+
+- Added '@' command as synonym for 'TAKE', for consistency with RSX180/280
+  command files and for compatibility with Kermit-11.
+
+- Using SYSLIB for terminal I/O.
+
+- Main loop already working: prompt is displayed, commands can be entered,
+  '?' help works, but remote connections are not yet implemented.
+
+- Faster STASPD and FNDKYW routines.
+
+- Replaced STACURD (show current disk) and STUSR (show current user)
+  routines by a single STACWD (show current device and directory).
+
+- SHOW command now working, almost all settings are correct.
+
+- Display host name on startup banner, and also when transferring a file.
+
+
+31/12/20
+
+- Rewriting file I/O routines.
+
+- Directory display is already working.
+
+
+01/01/21
+
+- Added 'CD' command to change current device and dir (not yet implemented)
+
+- Changed 'SET DEFAULT-DISK' to 'SET DEFAULT', does the same as the 'CD'
+  command.
+
+- Removed the 'SET USER' command.
+
+- Added 'SET LINE' as synonym for 'SET PORT' for compatibility with Kermit-11.
+
+- Fixed handling of control chars in command line (entering/deleting control
+  chars screwed up the display)
+
+- Filename parsing with the original TOPS-20-like filename completion almost
+  done (a few bugs still remaining).
+
+
+02/01/20
+
+- CHRCNT is now a 16-bit variable that contains the cumulative number of
+  chars stored in the big file I/O buffer, SECCNT and NXTBUF are no longer
+  necessary.
+
+- TYPE command now works.
+
+- ERASE and RENAME commands now working.
+
+- Added DELETE command as synonym for ERASE.
+
+- Changed the SET COLLISION command (does not make much sense for RSX180
+  anyway): removed the BACKUP option, and changed RENAME to NEW-VERSION.
+
+
+03/01/20
+
+- CD command: validate device before setting it as default. Allow specifying
+  directory as '[dir]' as well as just 'dir'.
+
+- More work on file I/O: code to open a file in append mode. COPY command
+  now working.
+
+- Writing to log file now works.
+
+- Log the characters entered at the terminal when LOCAL-ECHO is ON.
+
+- The SET LINE command now sets the comm device, and ensures it is a TTY.
+
+- Added simple, unbuffered comm line (modem) I/O routines. Linux Kermit
+  can already connect to the RSX180 Kermit, but file transfers fail.
+
+
+04/01/20
+
+- Buffering modem I/O improves reliability and performance a lot.
+
+- Disable TAC character by default.
+
+- First successful Kermit file transfer!!!
+
+- Remote server commands also working (e.g. REMOTE DIR, FINISH, etc.)
+
+
+05/01/20
+
+- Reading commands from a TAKE file is now working.
+
+- Command tail processing done.
+
+- CMKEYW routine: added a workaround for the '@' command so the space after
+  it is no longer required. This makes the syntax consistent with RSX180
+  conventions.
+
+- Compute number of file buffers from amount of available memory, but
+  limit initially the size to 8K.
+
+- Tested under RSX280, 19200 baud: works OK if the PC Kermit keeps packet
+  size is kept below 64. Increasing the read buffer to 128 bytes solved the
+  problem.
+
+- Implemented long directory display, borrowing code from good'ol PIP :)
+
+
+06/01/21
+
+- DIR command: display summary (number of files and free space) at the
+  end of the listing.
+
+- SET DIRECTORY-FILE_SIZE ON/OFF command changed to SET DIRECTORY-LISTING
+  LONG/BRIEF.
+
+- The PAUSE command now uses the .MRKT system call for precise delays.
+
+
+08/01/21
+
+- Small SDATA routine optimizations (keep pointers in regs, not in memory
+  variables)
+
+- Removed unused variables.
+
+- For auto-completion, lowercase the keyword if the user typed the first
+  part in lowercase.
+
+- When typing a command, treat the TAB key as ESC (auto-complete keyword).
+  When reading the command from a TAKE file, treat the TAB as a blank.
+
+- Use the TC.ANS terminal characteristics byte to select between VT100
+  and VT52 screen control sequences.
+
+- Name changed to Kermit-180 to avoid confusion with the CP/M version.
+
+
+09/01/21
+
+- More precise timeout control for the INPUT command.
+
+- The receive packet routine now times out after the given RTIME seconds.
+
+- Purge modem input on timeout.
+
+
