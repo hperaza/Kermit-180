@@ -1,0 +1,40 @@
+; KSER.MAC
+;       KERMIT - (Celtic for "FREE")
+;
+;       This is the RSX180/280 implementation of the Columbia University
+;       KERMIT file transfer protocol.
+;
+;       Version 4.0
+;
+;       Copyright June 1981,1982,1983,1984
+;       Columbia University
+;
+; Originally written by Bill Catchings of the Columbia University Center for
+; Computing Activities, 612 W. 115th St., New York, NY 10025.
+;
+; Contributions by Frank da Cruz, Daphne Tzoar, Bernie Eiben,
+; Bruce Tanner, Nick Bush, Greg Small, Kimmo Laaksonen, Jeff Damens, and many
+; others. 
+;
+;       This file contains the (system-independent) routines that implement
+;       the SERVER part of the KERMIT protocol.
+;
+; Revision history:
+;
+; edit 1: September, 1987.  Created CPSSER.ASM from bits from the two CPSPK?
+;	files.  
+;	The code herein is to allow remote systems to communicate to 
+;	this Kermit running in SERVER mode.  Note that not every server 
+;	command will be supported, mind...
+
+	.Z80
+
+	include	KDEF.INC
+
+	public	SERVER
+
+	cseg
+
+SERVER:	db	'KSER  (1) 27-Dec-2020',0	; name, edit number, date
+
+	end
