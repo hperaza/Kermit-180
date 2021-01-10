@@ -79,7 +79,7 @@ The filename completion (e.g. for DIR or ERA commands) is not working fully corr
 
 When using C-Kermit 9.0 on Linux, a file transfer from the PC to the Z280RC sometimes stalls and then aborts with a "Too many retries" error. Usually restarting the transfer fixes the problem, but it can get stubborn stopping at approximately the same spot over and over. The older C-Kermit 5A(190) does not show the problem.
 
-_Update:_ the problem was traced back to C-Kermit taking certain liberties with
+**Update:** the problem was traced back to C-Kermit taking certain liberties with
 the Kermit protocol: specifically, not prefixing all control characters like it
 should.  The `set control-character prefixed all` fixes the problem.  Also,
 I'd recommend to use `set file patterns off` and `set transfer mode manual`
