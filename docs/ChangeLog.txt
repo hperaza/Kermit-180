@@ -135,7 +135,7 @@ Using Kermit-80 4.11 as the base version.
 - DIR command: display summary (number of files and free space) at the
   end of the listing.
 
-- SET DIRECTORY-FILE_SIZE ON/OFF command changed to SET DIRECTORY-LISTING
+- SET DIRECTORY-FILE-SIZE ON/OFF command changed to SET DIRECTORY-LISTING
   LONG/BRIEF.
 
 - The PAUSE command now uses the .MRKT system call for precise delays.
