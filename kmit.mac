@@ -21,7 +21,15 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 31, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+; edit 31, 12-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Added '@' command as synonym for TAKE for consustency with RSX180/280
+;       command files. Added CD command to change the current device and
+;       directory. The PAUSE command now uses system timer services for
+;       accurate delays. Ported the initialization code, and moved all
+;       system-dependent functions to the KSYS.MAC module (the only two
+;       system calls remaining here are .GCML and .EXIT, which will be
+;       eventually moved to KSYS.MAC as well). The prompt now displays the
+;       current device and directory.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
@@ -269,7 +277,7 @@
 
 	cseg
 
-MITVER:	defb	'KMIT (31) 27-Dec-2020',0	; name, edit number, date
+MITVER:	defb	'KMIT (31) 12-Jan-2021',0	; name, edit number, date
 
 ; Initialization
 
@@ -641,8 +649,7 @@ LOG:	ld	a,CMOFI		; parse an output filespec
 PAUSE:	ld	a,CMNUM		; get the number of the wait period
 	call	COMND		; get it
 	jp	PSERR		; we canna do it
-	ld	de,(NUMBER)
-	ex	de,hl		; get period into HL
+	ld	hl,(NUMBER)	; get period into HL
 	call	DELAY		; sleep until timeout expires or a key is pressed
 	jp	KERMIT		; otherwise we are done.
 PSERR:	ld	de,ERMS24

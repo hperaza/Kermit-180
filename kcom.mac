@@ -20,7 +20,15 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+; edit 14, 6-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Null now marks the end of strings, so we can use SYSLIB routines.
+;       Replaced SET USER and SET DEFAULT-DISK commands by a single SET
+;       DEFAULT command that changes the current device and directory.
+;       Added SET LINE as synonym for SET PORT, for compatibilty with
+;       Kermit-11. Changed the SET COLLISION command: removed the BACKUP
+;       option, since it does not make much sense under RSX180/280, and
+;       changed RENAME to NEW-VERSION. Changed SET DIRECTORY-FILE-SIZE ON/OFF
+;       command to SET DIRECTORY-LISTING LONG/BRIEF.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
@@ -131,7 +139,7 @@
 
 	cseg
 
-COMVER:	defb	'KCOM (14) 27-Dec-2020',0	; name, edit no. and date
+COMVER:	defb	'KCOM (14)  6-Jan-2021',0	; name, edit no. and date
 
 ; This is the SET command.
 

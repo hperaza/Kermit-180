@@ -21,6 +21,11 @@
 ; Revision history (latest first):
 ;
 ; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Fixed handling of control chars in command line, so they no longer
+;       screw up the display. Filename parsing now uses the PFN SYSLIB routine.
+;       When auto-completing, lowercase the keyword if the user typed the first
+;       part in lowercase. TAB now also auto-completes keyword, except when
+;       reading from a TAKE file.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
@@ -131,7 +136,7 @@
 
 	cseg
 
-CMDVER:	defb	'KCMD (13) 27-Dec-2020',0	; name, edit number, date
+CMDVER:	defb	'KCMD (14)  8-Jan-2021',0	; name, edit number, date
 
 ; This routine prints the prompt in DE and specifies the reparse address.
 ; Called by:  KERMIT

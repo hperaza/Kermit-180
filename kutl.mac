@@ -20,6 +20,14 @@
 ; Revision history (latest first):
 ;
 ; edit 32, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Low-level file I/O routines are now in the KSYS.MAC module. Rewritten
+;       the INBUF and OUTBUF routines, CHRCNT is now 16-bit wide and holds
+;       the number of valid bytes in the "big buffer". SECCNT and NXTBUF
+;       became superfluous and therefore removed. The new code also fixes
+;       the CHRCNT problem being decremented before a character was actually
+;       fetched from the buffer (see edit 29). Added a number of common
+;       utility routines e.g. to convert RSX180 device names, directory
+;       names and FCB filespecs to string, to copy strings, etc.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:

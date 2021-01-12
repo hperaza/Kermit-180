@@ -21,6 +21,7 @@
 ; Revision history (latest first):
 ;
 ; edit 13, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Low-level log file file I/O routines are now in the KSYS.MAC module.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:

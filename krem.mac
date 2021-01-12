@@ -20,7 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+; edit 14, 31-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Output a newline before displaying the output to prevent overwriting
+;       the prompt.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:

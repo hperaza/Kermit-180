@@ -21,7 +21,10 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 29, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+; edit 29, 9-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Optimized a bit the SDATA routine (keep pointers in registers, not in
+;       memory variables). The receive packet routine now times out after the
+;       given RTIME seconds. Purge modem input on timeout.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
@@ -2991,7 +2994,7 @@ PRINTM:	ld	a,(hl)		; get character from string
 	jp	PRINTM		; go output rest of string
 
 ; Test if character in A is the start of header character.  We get
-; the start of packet character from sohchr, which can be SET
+; the start of packet character from SOHCHR, which can be SET
 ; [HP] not used?
 
 TSTSOH:	push	hl		; save these registers for a bit
@@ -3002,8 +3005,8 @@ TSTSOH:	push	hl		; save these registers for a bit
 
 	dseg
 
-REMNAM:	defs	60		; secondary filename storage (remote on send,
-				; local on get)
+REMNAM:	defs	60		; secondary filename storage (remote on Send,
+				; local on Get)
 REMLEN:	defs	1		; length of name
 TIMVAL:	defw	0		; timer value
 DATPTR:	defs	2		; position in packet data buffer

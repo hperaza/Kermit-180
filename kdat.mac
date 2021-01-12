@@ -20,6 +20,10 @@
 ; Revision history (latest first):
 ;
 ; edit 20, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+;       Removed unused variables, added new ones for RSX180/280. Messages
+;       moved to the modules that use them to avoid public-external symbol
+;       nightmares (and other messages like help, keyword tables and system
+;       errors were already in local modules)
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
