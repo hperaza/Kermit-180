@@ -20,7 +20,15 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 15, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
+; edit 15, 9-Jan-2021 by H. Peraza: converted to Z80, rewritten almost
+;       completely for the RSX180/280 system. All I/O is now done here,
+;       so there are no more system calls (previously BDOS calls) scattered
+;       through the code. The DIRECTORY command now outputs file attributes
+;       and creation date in addition to file sizes when the listing mode
+;       is set to LONG, so it looks similar to PIP's output. The TC.ANS
+;       terminal characteristics byte is used to select between VT100 and
+;       VT52 screen control sequences. Modem I/O routines are buffered,
+;       with input timeout. Terminal input uses unsolicited-char AST.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Old Kermit-80 4.11 revision history:
@@ -163,7 +171,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (15) 06-Jan-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (15)  9-Jan-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -527,33 +535,41 @@ SETBD:	ld	(BAUDRT),a	; store it
 	ret
 
 ; Speed tables
-;   (Note that speed tables MUST be in alphabetical order for later
+;   (Note that speed tables MUST be in *alphabetical* order for later
 ;   lookup procedures, and must begin with a value showing the total
 ;   number of entries.  The speed help tables are just for us poor
 ;   humans.
 
 ;       db      string length,string,divisor (2 identical bytes or 1 word)
 
-SPDTBL:	defb	10h		; 16 entries
-	defb	03h,'110',0,    02h,02h
-	defb	04h,'1200',0,   07h,07h
-	defb	05h,'134.5',0,  03h,03h
-	defb	03h,'150',0,    04h,04h
-	defb	04h,'1800',0,   08h,08h
-	defb	05h,'19200',0,  0Fh,0Fh
-	defb	04h,'2000',0,   09h,09h
-	defb	04h,'2400',0,   0Ah,0Ah
-	defb	03h,'300',0,    05h,05h
-	defb	04h,'3600',0,   0Bh,0Bh
-	defb	04h,'4800',0,   0Ch,0Ch
-	defb	02h,'50',0,     00h,00h
-	defb	03h,'600',0,    06h,06h
-	defb	04h,'7200',0,   0Dh,0Dh
-	defb	02h,'75',0,     01h,01h
-	defb	04h,'9600',0,   0Eh,0Eh
+SPDTBL:	defb	23		; 23 entries
+	defb	3,'110',0,	03h,03h
+	defb	6,'115200',0,	17h,17h
+	defb	4,'1200',0,	09h,09h
+	defb	5,'134.5',0,	04h,04h
+	defb	5,'14400',0,	11h,11h
+	defb	3,'150',0,	05h,05h
+	defb	4,'1800',0,	0Ah,0Ah
+	defb	5,'19200',0,	12h,12h
+	defb	3,'200',0,	06h,06h
+	defb	4,'2000',0,	0Bh,0Bh
+	defb	4,'2400',0,	0Ch,0Ch
+	defb	5,'28800',0,	13h,13h
+	defb	3,'300',0,	07h,07h
+	defb	4,'3600',0,	0Dh,0Dh
+	defb	5,'38400',0,	14h,14h
+	defb	4,'4800',0,	0Eh,0Eh
+	defb	2,'50',0,	01h,01h
+	defb	5,'57600',0,	15h,15h
+	defb	3,'600',0,	08h,08h
+	defb	4,'7200',0,	0Fh,0Fh
+	defb	2,'75',0,	02h,02h
+	defb	5,'76800',0,	16h,16h
+	defb	4,'9600',0,	10h,10h
 
-SPHTBL:	defb	CR,LF,'   50     75    110    134.5  150    300    600   1200'
-	defb	CR,LF,' 1800   2000   2400   3600   4800   7200   9600  19200'
+SPHTBL:	defb	CR,LF,'   50     75    110    134.5  150    200    300    600'
+	defb	CR,LF,' 1200   1800   2000   2400   3600   4800   7200   9600'
+	defb	CR,LF,'14400  19200  28800  38400  57600  76800 115200'
 	defb	0
 
 ; This is the system-dependent SET PORT command.
