@@ -3,7 +3,7 @@
 
 1. RSX180/280 Kermit
 
-Author:     Hector Peraza
+Program:    Hector Peraza
 Language:   Z80 Assembler, ZSM4
 OS:         RSX180 and RSX280
 Version:    4.12
