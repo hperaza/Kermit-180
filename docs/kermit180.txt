@@ -122,7 +122,7 @@ exceptions:
      attributes and creation date using a format similar to RSX180/280's
      PIP command.
 
-   - SET COLLISION {DISCARD/OVERWRITE/NEW-VERSION} The BACKUP option was
+   - SET COLLISION {DISCARD/OVERWRITE/NEW-VERSION}. The BACKUP option was
      removed, since RSX180/280 automatically creates a new version of an
      existing file, keeping the old one.  The RENAME option was changed
      to NEW-VERSION and makes sense only when transferring files from
@@ -619,15 +619,12 @@ SET parameter [value]
         NO-EXIT This command is applicable only for Kermit initiated with a
                 command tail.  For example, if Kermit was initiated by:
 
-                KERMIT ;SEND HELLO;NO-EXIT
+                KERMIT SEND HELLO;NO-EXIT
 
                 Kermit would first seek out and execute the KERMIT.INI file
                 (if present), then send file HELLO to a remote system. 
                 Usually Kermit would exit back to the system, but NO-EXIT
                 over-rides this.  STAY is a synonym for NO-EXIT.
-
-                Note the leading semicolon.  This clears leading spaces from
-                the first command.
 
         PARITY option
                 Sets parity for outgoing characters to one of the following:
