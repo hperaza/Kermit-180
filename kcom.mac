@@ -811,6 +811,7 @@ BAUD:	ld	hl,(SPDTAB)	; get pointer to speed table
 	ld	(SPEED),hl	; save all 16 bits of speed value
 	ex	de,hl		; move speed to DE
 	call	SYSSPD		; do system-dependent speed setting.
+	;TODO: handle errors
 	jp	KERMIT		; return to command level
 
 ; SET PORT and SET LINE commands
@@ -1251,7 +1252,7 @@ STASPD:	ld	de,SPDST
 	ld	a,(SPEED)	; get current speed
 	ld	hl,SPDUST	; assume undefined
 	cp	0FFh		; is it?
-	jp	z,STAT73	; yes
+	jr	z,STAT73	; yes
 	push	de		; save message pointer
 	ld	hl,(SPDTAB)	; start scanning keyword table
 	ld	b,(hl)		; get count of entries
@@ -1264,7 +1265,7 @@ STAT70:	ld	e,(hl)		; get string length
 	add	hl,de		; skip over string
 	ld	c,(hl)		; get speed value
 	cp	c		; match?
-	jp	z,STAT72	; yes
+	jr	z,STAT72	; yes
 	inc	hl		; bump to next keyword
 	inc	hl
 	djnz	STAT70		; if more left, check them

@@ -317,14 +317,14 @@ READ12:	xor	a
 	ld	(NUMTRY),a	; set the number of tries to zero
 	ld	a,(QUIETD)	; quiet display?
 	and	a
-	jp	nz,READ13	; yes, so don't write...
+	jr	nz,READ13	; yes, so don't write...
 	call	SCRNRT		; position cursor
 	ld	hl,0
 	call	NOUT		; write the number of retries
 	call	FLSCON
 READ13:	ld	a,(RDL)		; Get or Receive?
 	or	a
-	jp	nz,READ2	; Get, don't reset state
+	jr	nz,READ2	; Get, don't reset state
 	ld	a,'R'
 	ld	(STATE),a	; set the state to Receive-Initiate
 	;...
@@ -333,32 +333,32 @@ READ13:	ld	a,(RDL)		; Get or Receive?
 
 READ2:	ld	a,(QUIETD)	; noisy display?
 	and	a
-	jp	nz,READ21	; no, a quiet one
+	jr	nz,READ21	; no, a quiet one
 	ld	a,(REMTXT)	; in Remote command?
 	or	a
-	jp	nz,READ21	; yes, don't write to screen
+	jr	nz,READ21	; yes, don't write to screen
 	call	SCRNP		; position cursor
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the current packet number
 	call	FLSCON
 READ21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Receive state?
-	jp	nz,READ22
+	jr	nz,READ22
 	call	RDATA
 	jp	READ2
 
 READ22:	cp	'X'		; F packet but not an F packet?
-	jp	nz,READ3	; nope, so try next one
+	jr	nz,READ3	; nope, so try next one
 	call	RFILE		; 'get' the filename (but don't open it)
 	jp	READ2
 
 READ3:	cp	'F'		; are we in the File Receive state?
-	jp	nz,READ4
-	call	RFILE		; call receive file
+	jr	nz,READ4
+	call	RFILE		; call Receive File
 	jp	READ2
 
 READ4:	cp	'R'		; are we in the Receive-Initiate state?
-	jp	nz,READ5
+	jr	nz,READ5
 	call	RINIT
 	ld	a,(STATE)	; get new state
 	cp	'F'		; went into Receive state?
@@ -368,11 +368,11 @@ READ4:	cp	'R'		; are we in the Receive-Initiate state?
 	jp	READ2
 
 READ5:	cp	'C'		; are we in the Receive-Complete state?
-	jp	nz,READ6
+	jr	nz,READ6
 	ld	de,INFMS3	; put in "Complete" message
 	ld	a,(CZSEEN)	; or was it interrupted?
 	or	a
-	jp	z,READ5A	; no.
+	jr	z,READ5A	; no.
 	xor	a		; yes, clear flag
 	ld	(CZSEEN),a
 	ld	de,INMS13	; issue "Interrupted" message
@@ -395,12 +395,12 @@ READ6:	cp	'Y'		; simple ACK (from Remote command)?
 	jp	z,KERMIT	; yes
 
 	cp	'I'		; exchanging parameters via info packet?
-	jp	nz,READ7	; no
+	jr	nz,READ7	; no
 	call	SINIT		; yes, send the packet
 	ld	a,(STATE)	; now see what happened
 	cp	'X'		; did we exchange parameters successfully?
-	jp	z,READ6A	; yes, go send the filespec
-	cp	'A'		; no, are we in abort state?
+	jr	z,READ6A	; yes, go send the filespec
+	cp	'A'		; no, are we in Abort state?
 	jp	nz,READ2	; no, try again
 	jp	KERMIT		; yes, it's a real disaster, we must stop
 READ6A:	ld	a,(RDL)		; get length of filespec
@@ -561,7 +561,7 @@ RFILE3:	cp	'F'		; start of file?
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
 	ld	a,c
-	jp	nz,RFIL3A	; yes, don't open a file
+	jr	nz,RFIL3A	; yes, don't open a file
 	call	GOFIL		; get a file to write to, and init output buffer
 	jp	ABORT
 RFIL3A:	ld	a,(NUMTRY)	; get the number of tries
@@ -602,7 +602,7 @@ RFIL3F:	push	af		; save loop counter
 	pop	hl		; restore pointer
 	pop	af		; and loop counter
 	dec	a		; decrement the counter
-	jp	nz,RFIL3F	; display entire filename
+	jr	nz,RFIL3F	; display entire filename
 	ld	e,'>'		; put in ">>" as in VMSKermit
 	push	de
 	call	OUTCON
@@ -655,7 +655,7 @@ RDAT16:	ld	a,(REMTXT)	; is a Remote command in progress?
 	jp	nz,ABORT	; yes, don't worry about file disposition
 	ld	a,(INCFLG)	; are we keeping incomplete files?
 	or	a
-	jp	nz,RDAT17	; yes
+	jr	nz,RDAT17	; yes
 	call	CLOSE2		; no, close the file, ignoring errors
 	call	DELET2		; now delete the file, ignoring errors
 	jp	ABORT		; change the state to Abort
@@ -706,7 +706,7 @@ RDAT15:	ld	a,'Y'		; acknowledge packet
 	ret
 
 RDATA2:	cp	'F'		; start of file?
-	jp	nz,RDATA3	; no, try next type
+	jr	nz,RDATA3	; no, try next type
 	ld	a,(OLDTRY)	; get the number of tries
 	cp	MAXTRY		; have we reached the maximum number of tries?
 	jp	m,RDAT21	; if not, proceed
@@ -724,13 +724,13 @@ RDATA3:	cp	'Z'		; is it a EOF packet?
 	call	COUNTP		; increment packet number modulo 64
 	ld	a,(ARGBLK+1)	; get the data length
 	cp	1		; have one item?
-	jp	nz,RDAT33	; if not, ignore data
+	jr	nz,RDAT33	; if not, ignore data
 	ld	a,(DATA)	; yes, get the character
 	cp	'D'		; is it a 'D' for discard?
 	jp	z,RDAT36	; if so, punt file
 RDAT33:	ld	a,(REMTXT)	; writing text to disk?
 	or	a
-	jp	nz,RDAT38	; no, don't close file
+	jr	nz,RDAT38	; no, don't close file
 	call	CLOFIL		; finish off the file
 	jp	RDAT37		; give up if the disk is full
 RDAT38:	xor	a		; since we kept the file,
@@ -799,7 +799,7 @@ SEND:	ld	a,CMIFI		; parse an input file spec
 
 	call	MFINIT		; initialize file search
 	call	MFNAME		; handle (multi) files
-	jp	nc,SEND14	; got a valid file-name
+	jr	nc,SEND14	; got a valid file-name
 	ld	de,ERMS15
 	call	PRTSTR		; display error msg. (where it's visible)
 	jp	KERMIT
@@ -814,7 +814,7 @@ SEND14:	call	INIT		; clear the line and initialize the buffers
 	ld	(NUMRTR),hl	; set the number of retries to zero
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	nz,SEND15	; yup, don't write
+	jr	nz,SEND15	; yup, don't write
 	call	SCRNRT		; position cursor
 	ld	hl,0
 	call	NOUT		; write the number of retries
@@ -829,29 +829,29 @@ SEND15:	ld	a,'1'		; reset to use single character checksum
 
 SEND2:	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	nz,SEND21	; yes, so don't write
+	jr	nz,SEND21	; yes, so don't write
 	call	SCRNP		; position cursor
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the packet number
 	call	FLSCON
 SEND21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Send state?
-	jp	nz,SEND3
+	jr	nz,SEND3
 	call	SDATA
 	jp	SEND2
 
 SEND3:	cp	'F'		; are we in the File Send state?
-	jp	nz,SEND4
+	jr	nz,SEND4
 	call	SFILE		; call Send File
 	jp	SEND2
 
 SEND4:	cp	'Z'		; are we in the EOF state?
-	jp	nz,SEND5
+	jr	nz,SEND5
 	call	SEOF
 	jp	SEND2
 
 SEND5:	cp	'S'		; are we in the Send Initiate state?
-	jp	nz,SEND6
+	jr	nz,SEND6
 	call	SINIT
 	ld	a,(STATE)	; get state back
 	cp	'F'		; into File Send state yet?
@@ -861,22 +861,22 @@ SEND5:	cp	'S'		; are we in the Send Initiate state?
 	jp	SEND2
 
 SEND6:	cp	'B'		; are we in the EOT state?
-	jp	nz,SEND7
+	jr	nz,SEND7
 	call	SEOT
 	jp	SEND2
 
 SEND7:	cp	'C'		; are we in the Send Complete state?
-	jp	nz,SEND8	; no...
+	jr	nz,SEND8	; no...
 	ld	de,INFMS3	; yes, write "Complete" message.
 	ld	a,(CZSEEN)	; or was it interrupted?
 	or	a
-	jp	z,SEND7A	; no
+	jr	z,SEND7A	; no
 	ld	de,INMS13	; yes, then say "Interrupted" instead
 SEND7A:	call	FINMES
 	jp	KERMIT
 
 SEND8:	cp	'A'		; are we in the Send "Abort" state?
-	jp	nz,SEND9
+	jr	nz,SEND9
 	ld	de,INFMS4	; print message
 	call	FINMES
 	jp	KERMIT
@@ -989,7 +989,7 @@ SFILE1:	inc	a		; increment it
 
 	ld	a,(REMLEN)	; anything given?
 	or	a
-	jp	nz,SFILE4	; use remote name
+	jr	nz,SFILE4	; use remote name
 
 	; copy local name into packet to send
 
@@ -1015,7 +1015,7 @@ SFILE4:	; copy remote name into packet to send
 SFIL13:	ld	(ARGBLK+1),a	; store number of chars in file name
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	nz,SFI13A	; yes, don't write
+	jr	nz,SFI13A	; yes, don't write
 	call	SCRFLN		; position cursor
 SFI13A:	ld	de,DATA		; print the file name though, in either case
 	call	PRTSTR
@@ -1054,7 +1054,7 @@ SFIL16:	cp	0FFh		; is it EOF?
 	ret	
 
 SFILE2:	cp	'N'		; NAK?
-	jp	nz,SFILE3	; try if Error packet
+	jr	nz,SFILE3	; try if Error packet
 	call	UPDRTR		; update the number of retries
 	ld	a,(PKTNUM)	; get the present packet number
 	inc	a		; increment
@@ -1093,17 +1093,17 @@ SDAT11:	ld	a,(hl)		; get char
 	ld	a,(QUOT8)	; doing eighth-bit quoting?
 	or	a
 	ld	a,c		; restore char
-	jp	nz,SDAT4	; using eighth-bit quoting, no warning
+	jr	nz,SDAT4	; using eighth-bit quoting, no warning
 	ld	a,(PARITY)	; get parity
 	cp	PARNON		; none?
 	ld	a,c		; restore character
 	jp	z,SDAT4		; no parity, leave char alone
 	ld	a,(WRN8)	; look at warning flag
 	or	a		; have we already given the warning?
-	jp	nz,SDAT5	; yes, skip this
+	jr	nz,SDAT5	; yes, skip this
 	ld	a,c		; restore character...
 	and	80h		; examine parity
-	jp	z,SDAT5		; no parity, no warning
+	jr	z,SDAT5		; no parity, no warning
 	call	PARWRN		; ...print warning - parity lost
 	ld	a,0FFh		; remember that we sent the message
 	ld	(WRN8),a
@@ -1134,14 +1134,14 @@ SDAT4:	ld	(de),a		; put the char in the data packet
 	ld	(NUMTRY),a	; reset the number of tries
 	ld	a,(ARGBLK+1)	; get the data length
 	cp	1		; check if only 1 character?
-	jp	nz,SDAT15	; if not, just continue
+	jr	nz,SDAT15	; if not, just continue
 	ld	a,(DATA)	; got one character, get it from data
 	cp	'Z'		; want to abort entire stream?
-	jp	nz,SDAT14	; if not, check for just this file
+	jr	nz,SDAT14	; if not, check for just this file
 	ld	(CZSEEN),a	; yes, remember it
 	jp	SDAT16		;  and set EOF state
 SDAT14:	cp	'X'		; desire abort of current file?
-	jp	nz,SDAT15	; no, just continue
+	jr	nz,SDAT15	; no, just continue
 	ld	(CZSEEN),a	; yes, remember that
 	jp	SDAT16		;  and set EOF
 SDAT15:	ld	a,(CZSEEN)	; also get control-Z flag
@@ -1163,7 +1163,7 @@ SDAT13:	cp	0FFh		; is it EOF?
 	ret	
 
 SDATA2:	cp	'N'		; NAK?
-	jp	nz,SDATA3	; see if is an Error packet
+	jr	nz,SDATA3	; see if is an Error packet
 	call	UPDRTR		; update the number of retries
 	ld	a,(PKTNUM)	; get the present packet number
 	inc	a		; increment
@@ -1197,7 +1197,7 @@ SEOF1:	inc	a		; increment it
 	ld	(ARGBLK+1),a	; no data
 	ld	a,(CZSEEN)	; check if Control-Z or Control-X typed
 	or	a
-	jp	z,SEOF14	; if not aborted, just keep going
+	jr	z,SEOF14	; if not aborted, just keep going
 	ld	a,'D'		; tell other end to discard packet
 	ld	(DATA),a	; store in data portion
 	ld	a,1		; one character
