@@ -496,7 +496,7 @@ SET parameter [value]
         Set the specified parameter to the specified value.  Possible
         parameter settings:
 
-        AUTORECEIVE ON (or OFF).
+        AUTORECEIVE ON (or OFF)
                 Allows several files to be received without having to type
                 RECEIVE on the receiving machine.  The routine simply looks
                 for activity on the serial line, and if so fudges a RECEIVE
@@ -521,9 +521,6 @@ SET parameter [value]
                 can be from 1 (512 bytes) to the maximum value determined by
                 how much memory was available to the program on startup.
 
-                RSX180/280 filenames will still be mapped to uppercase
-                characters.
-
         COLLISION value
                 What to do when a file arrives that has the same name, type
                 and version as an existing file.  DISCARD means to discard
@@ -531,7 +528,7 @@ SET parameter [value]
                 the existing file.  NEW-VERSION means to write a new version
                 of the file.
 
-        DEBUG ON (or OFF).
+        DEBUG ON (or OFF)
                 Enables/disables displaying of packets on the screen during
                 file transfer.  Not performed if the QUIET option has been
                 set for the terminal (SET TERMINAL QUIET)
@@ -548,7 +545,7 @@ SET parameter [value]
 
                     Kermit-180 SY0:[USER]>
 
-        DIRECTORY-LISTING LONG (or BRIEF).
+        DIRECTORY-LISTING LONG (or BRIEF)
                 By setting DIRECTORY-LISTING to BRIEF you can get an
                 abbreviated listing of your disk drive.  File sizes and
                 attributes are not shown, and up to three files are shown on
@@ -819,7 +816,7 @@ Kermit-180 is built in from the following files:
   KUTL.MAC    Utility routines and data
   KDAT.MAC    Global data space
 
-Unlike Kermit-80, there are no customizable system-depedent files since all
+Unlike Kermit-80, there are no customizable system-dependent files since all
 the communication is done via the system device drivers, and RSX180/280 are
 not allowed to access I/O ports directly anyway.
 
