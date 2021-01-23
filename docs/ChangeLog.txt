@@ -65,7 +65,7 @@ Using Kermit-80 4.11 as the base version.
   done (a few bugs still remaining).
 
 
-02/01/20
+02/01/21
 
 - CHRCNT is now a 16-bit variable that contains the cumulative number of
   chars stored in the big file I/O buffer, SECCNT and NXTBUF are no longer
@@ -81,7 +81,7 @@ Using Kermit-80 4.11 as the base version.
   anyway): removed the BACKUP option, and changed RENAME to NEW-VERSION.
 
 
-03/01/20
+03/01/21
 
 - CD command: validate device before setting it as default. Allow specifying
   directory as '[dir]' as well as just 'dir'.
@@ -99,7 +99,7 @@ Using Kermit-80 4.11 as the base version.
   can already connect to the RSX180 Kermit, but file transfers fail.
 
 
-04/01/20
+04/01/21
 
 - Buffering modem I/O improves reliability and performance a lot.
 
@@ -110,7 +110,7 @@ Using Kermit-80 4.11 as the base version.
 - Remote server commands also working (e.g. REMOTE DIR, FINISH, etc.)
 
 
-05/01/20
+05/01/21
 
 - Reading commands from a TAKE file is now working.
 
@@ -167,5 +167,12 @@ Using Kermit-80 4.11 as the base version.
 - The receive packet routine now times out after the given RTIME seconds.
 
 - Purge modem input on timeout.
+
+
+17/01/21
+
+- Bug fix: the original terminal settings were not restored at exit.
+
+- The SET SPEED command now uses TC.SPD to set the communication line speed.
 
 
