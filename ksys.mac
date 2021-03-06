@@ -299,6 +299,10 @@ SINIT6:	add	hl,de		;  as multiple of BUFSIZ
 
 SINIT7:	ld	de,NOROOM	; not enough room for buffers
 	call	PRTSTR		; complain about it
+	xor	a
+	ld	(TTCHR1+1),a
+	ld	hl,QIOSTC
+	SC	.QIO		; restore terminal mode
 	ld	hl,EX.SEV	; and return with error status
 	SC	.EXIT
 
@@ -311,15 +315,19 @@ SYSEXIT:
 	call	TTFLSH		; flush terminal output
 	ld	a,(MDMSET)
 	or	a		; comm line attached?
-	ret	z		; no, return
+	jr	z,sysx1		; no
 	ld	hl,MDMRST
 	SC	.QIO		; restore original comm line settings
 	ld	c,LUNMDM
 	call	DETACH		; detach from comm line
-	ld	c,LUNTI
-	call	DETACH		; detach from terminal
 	xor	a
 	ld	(MDMSET),a
+sysx1:	xor	a
+	ld	(TTCHR1+1),a
+	ld	hl,QIOSTC
+	SC	.QIO		; restore terminal mode
+	ld	c,LUNTI
+	call	DETACH		; detach from terminal
 	ret
 
 ; Delay routine. Called with time (seconds) in HL. Aborts delay if a
@@ -571,7 +579,7 @@ SPDTBL:	defb	23		; 23 entries
 	defb	3,'600',0,	S.600,	S.600
 	defb	4,'7200',0,	S.7200,	S.7200
 	defb	2,'75',0,	S.75,	S.75
-	defb	5,'76800',0,	S.78K6,	S.78K6
+	defb	5,'76800',0,	S.76K8,	S.76K8
 	defb	4,'9600',0,	S.9600,	S.9600
 
 SPHTBL:	defb	CR,LF,'   50     75    110    134.5  150    200    300    600'
@@ -2503,7 +2511,7 @@ IXREAD:	ld	a,h
 	ld	a,E.INV
 	scf
 	ret	z
-	ld	de,INODE	; use a dedicate dest buffer
+	ld	de,INODE	; use a dedicated dest buffer
 	ld	(QSRD+Q.BUF),de
 	ld	de,IESZ		; read only a single entry
 	ld	(QSRD+Q.LEN),de

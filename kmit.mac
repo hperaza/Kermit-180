@@ -514,12 +514,11 @@ BYE:	call	CFMCMD		; confirm,,,
 	jp	EXIT1		; exit Kermit
 
 ; This is the EXIT command.  It leaves KERMIT and returns to the system.
-; Alternate entries: EXIT1, from BYE command;
-; EXIT2, from initialization (if it fails)
+; Alternate entry: EXIT1, from BYE command;
 
 EXIT:	call	CFMCMD		; confirm...
 EXIT1:	call	SYSEXIT		; do system-dependent termination
-EXIT2:	ld	hl,EX.SUC
+	ld	hl,EX.SUC
 	SC	.EXIT
 
 ; Input command.  Syntax:

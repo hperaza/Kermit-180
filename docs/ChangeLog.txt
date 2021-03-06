@@ -176,3 +176,8 @@ Using Kermit-80 4.11 as the base version.
 - The SET SPEED command now uses TC.SPD to set the communication line speed.
 
 
+06/03/21
+
+- Restore terminal mode (disable binary mode) on exit.
+
+
