@@ -215,6 +215,8 @@
 
 	.Z80
 
+	ident	/32/
+
 	include	KDEF.INC
 	include	FCB.INC
 	include	ERRORS.INC

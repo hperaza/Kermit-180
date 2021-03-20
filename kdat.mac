@@ -19,6 +19,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 21, 19-Mar-2021 by H. Peraza: added Server Mode flag.
+;
 ; edit 20, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Removed unused variables, added new ones for RSX180/280. Messages
 ;       moved to the modules that use them to avoid public-external symbol
@@ -100,6 +102,8 @@
 
 	.Z80
 
+	ident	/21/
+
 	include	KDEF.INC
 	include	FCB.INC
 
@@ -120,13 +124,13 @@
 	public	OLDTRY,RTIME,WRN8,DSCFLG,QUOT8,FILBUF,RPADCH,RQUOTE
 	public	SQUOTE,PACKET,SPADCH,SOHCHR,HOSTHS,HOSTNM,QBCHR
 	public	OUTPNT,RECPKT,RECPKX,TAKCNT,RPRMPT,CMDPTR,STARC
-	public	REXBUF,REXBFL,REXCNT
+	public	REXBUF,REXBFL,REXCNT,SRVFLG
 
 	extrn	TTAB,SPDTBL,SPHTBL
 
 	dseg
 
-DATVER:	defb	'KDAT (20) 27-Dec-2020',0
+DATVER:	defb	'KDAT (21) 19-Mar-2021',0
 
 	page
 
@@ -343,6 +347,7 @@ CHKTYP:	defb	DSCHKT	; checksum type desired
 TACFLG:	defb	0	; TAC trap flag (zero=OFF, nonzero=ON; when non-zero,
 		      	;  contains current TAC intercept character)
 TACCHR:	defb	TACVAL	; TAC intercept character
+SRVFLG:	defb	0	; Server mode flag
 BUFADR:	defs	2  	; pointer to big buffer for multiple-sector I/O
 BUFLEN:	defs	2	; big buffer size in bytes, must be a multiple of BUFSIZ
 BUFSEC:	defb	1	; number of sectors big buffer can hold (0 means 256)

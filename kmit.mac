@@ -21,6 +21,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 32, 19-Mar-2021 by H. Peraza: added SERVER command.
+;
 ; edit 31, 12-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Added '@' command as synonym for TAKE for consustency with RSX180/280
 ;       command files. Added CD command to change the current device and
@@ -250,7 +252,7 @@
 
 	.Z80
 
-	ident	/4.12/
+	ident	/4.20/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -264,12 +266,12 @@
 	extrn	READ0,REMOTE,RENAME,SEND,SETCOM,SHOW,STATUS,NOEXIT
 	extrn	XMIT,TYPE,SHOVER,CFMCMD,SYSINT,LOGO,SYSBYE,SYSEXIT
 	extrn	COMND,RD1CHL,CKCHR,SELMDM,OPENTK,CLSETK,PRCRLF,P20LN
-	extrn	DELAY,SETCWD,INPCON,SKPNAM,ADDHLA,NOTIMP
+	extrn	DELAY,SETCWD,INPCON,SKPNAM,ADDHLA,NOTIMP,SERVER,INIT
 
 	extrn	BANNER,VTFLG,TAKFLG,BUFSEC,PRNFL,LOGNAM,LOGFCB,GTRXFL
 	extrn	CMBFLG,CMQFLG,CBUFF,CBPTR,NEXITF,INITAK,REMTXT,CURDEV
 	extrn	CURDIR,NUMBER,STBUFF,STRCNT,REPCNT,ERRORC,LOGFLG
-	extrn	TAKNAM,TAKFCB,TAKCNT,TAKPTR,TTYTYP,FCB
+	extrn	TAKNAM,TAKFCB,TAKCNT,TAKPTR,TTYTYP,FCB,SRVFLG
 
 	extrn	ERMS15
 
@@ -340,6 +342,9 @@ KERMIT:	ld	SP,STACK	; get new stack pointer, old one might be bad
 	ld	(CMBFLG),a	; initial keyword must not be blank
 	ld	(CMQFLG),a	; allow character-echoing during commands
 	ld	(REMTXT),a	; clear remote-text-to-screen flag
+	ld	a,(SRVFLG)
+	or	a		; are we in server mode?
+	jp	nz,SERVER	; yes
 	ld	hl,KERM1
 	ld	de,CURDEV
 	call	DEVSTR
@@ -385,7 +390,7 @@ ERMES3:	db	CR,LF,'?Not confirmed',0
 ;
 ;   Note: this command table is in alphabetic order.
 
-COMTAB:	defb	35		; number of commands
+COMTAB:	defb	36		; number of commands
 	defb	1, '@',0	; synonym for TAKE
 	defw	TAKE
 	defb	5, 'BREAK',0
@@ -440,6 +445,8 @@ COMTAB:	defb	35		; number of commands
 	defw	SEND
 	defb	4, 'SEND',0
 	defw	SEND
+	defb	6, 'SERVER',0
+	defw	SERV
 	defb	3, 'SET',0
 	defw	SETCOM
 	defb	4, 'SHOW',0
@@ -484,6 +491,7 @@ TOPHLP:	defb	CR,LF,'@ takes commands from a file (same as TAKE)'
 	defb	CR,LF,'REMOTE to send commands to a remote server'
 	defb	CR,LF,'RENAME to rename a local file'
 	defb	CR,LF,'SEND file to host'
+	defb	CR,LF,'SERVER mode'
 	defb	CR,LF,'SET a parameter'
 	defb	CR,LF,'SHOW the parameters'
 	defb	CR,LF,'STATUS of Kermit'
@@ -668,6 +676,13 @@ TYPENT:	ld	(PRNFL),a	; type file entry, common for PRINT and TYPE
 	xor	a
 	ld	(PRNFL),a	; next clear the print flag
 	jp	KERMIT
+
+; SERV - Enter SERVER mode
+
+SERV:	ld	a,0FFh
+	ld	(SRVFLG),a	; set SERVER mode flag
+	call	INIT		; set up screen
+	jp	KERMIT		; enter Server via main loop
 
 ; TYPE - Type a file to the console.
 ;	This command is really the same as the PRINT command, but the output

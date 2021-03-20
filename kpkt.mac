@@ -21,6 +21,11 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 30, 20-Mar-2021 by H. Peraza: reset Server Mode flag in INCHR if
+;       the user entered Control-C at the console. Added SEND1 and READ1
+;       entry points for Server mode get and send commands. Close directory
+;       after sending last file in SEOF.
+;
 ; edit 29, 9-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Optimized a bit the SDATA routine (keep pointers in registers, not in
 ;       memory variables). The receive packet routine now times out after the
@@ -162,7 +167,7 @@
 ;	Needed for those terminals that cannot clear to end of line...
 ;
 ; edit 10, March 30th by OBSchou.  Set bits for automatically receiving
-;	another file if a remote sender sends files in seperate sessions.
+;	another file if a remote sender sends files in separate sessions.
 ;	The code simply checks the serial line, and if there is some
 ;	activity, assume its another SEND INIT packet.  As there is no
 ;	simple way to go to receive with the control-a, just ignore the
@@ -177,9 +182,9 @@
 ; edit 8: August 11, 1986    Godfrey N. Nix [gnn] Nottingham University
 ;       To ignore echoed packets (ie send 'S' receive 'S' before 'A');
 ;       To allow character other than SOH for packet header (see also
-;                       updates to CP4MIT and CP4UTL for other code needed);
+;          updates to CP4MIT and CP4UTL for other code needed);
 ;       To permit SEND and RECEIVE to specify a host filename which
-;                       is of a different structure to that of CP/M.
+;          is of a different structure to that of CP/M.
 ;
 ; edit 7: [OBSchou] 7 March, 1985.
 ;       Edited file with additions from MJ Carter.  He writes:
@@ -226,13 +231,15 @@
 
 	.Z80
 
+	ident	/30/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	FCB.INC
 
 	public	PKTVER,READ,READ0,READ2,SEND,LOGO,LOGOUT,FINISH
 	public	NAK,NAK0,ACKP,COUNTP,ERROR,ERROR0,RPACK,SPACK
-	public	SINIT,RINI2A
+	public	INIT,SINIT,SEND1,READ1,RINI2A,SPAR,SNDERR
 
 	extrn	KERMIT,KERMT3,COMND,PRTSTR,PRCRLF,SCRFLN,NOUT
 	extrn	SCRNP,SELCON,INPCON,OUTCON,SELMDM,INPMDM,OUTMDM
@@ -240,7 +247,7 @@
 	extrn	GETFIL,SCRST,RPPOS,SPPOS,SETPAR,CLRTOP,SCREND
 	extrn	MAKFIL,CFMCMD,SCRNRT,SCRERR,CLSETK,SYSSCR,FCBSTR
 	extrn	OPENRW,CLOSEF,CLOSE2,SETFCB,FCBS2,STRLEN,DELET2
-	extrn	FLSCON,R,RSKP
+	extrn	MFEND,CLREOL,FLSCON,R,RSKP
 
 	extrn	GTRXFL,REMDAT,RDL,QUIETD,STATE,CZSEEN,NUMPKT
 	extrn	NUMRTR,PKTNUM,NUMTRY,REMTXT,AUTORC,DATA,ARGBLK
@@ -250,7 +257,7 @@
 	extrn	SQUOTE,SPSIZ,SPAD,SPADCH,TEMP1,OUTPNT,TEMP3
 	extrn	FLWFLG,CHRCNT,BUFPNT,FMFLG,TEMP2,SOHCHR,FNBUF
 	extrn	IBMFLG,PACKET,DBGFLG,RECPKT,TAKFLG,RCVSOP,PRNFLG
-	extrn	SNDSOP,TACFLG,TIMFLG,SFCB,FCB,FCB2
+	extrn	SNDSOP,TACFLG,TIMFLG,SFCB,FCB,FCB2,SRVFLG
 
 	extrn	ERMS15
 
@@ -258,7 +265,7 @@
 
 	cseg
 
-PKTVER:	defb	'KPKT (29) 09-Jan-2021',0	; name, edit number, date
+PKTVER:	defb	'KPKT (30) 20-Mar-2021',0	; name, edit number, date
 
 ; GET command
 ; Here from: KERMIT
@@ -281,9 +288,20 @@ READ:	ld	a,0FFh		; we are doing a Get
 	call	PRCRLF		; yes, keep from overwriting the prompt
 	jr	READ00		;  and write filename
 READ01:	call	SCRFLN		; position cursor
+	call	CLREOL		; erase to end of line
 READ00:	ld	de,REMDAT	; print the file name, in either case
 	call	PRTSTR
 	jp	READ0A		; go get local name if any
+
+; Enter here from SERVER routine
+
+READ1:	xor	a		; we received a Server Send command
+	ld	(GTRXFL),a	; so set flag
+	ld	(REMTXT),a
+	inc	a
+	ld	(RDL),a
+	call	RINI2A		; ACK the Send-Init packet with params
+	jr	READ11
 
 ; Enter here for RECEIVE command
 
@@ -300,14 +318,11 @@ READ0A:	ld	de,REMNAM	; save local name here
 				;  pretend get for printing filename
 	ld	a,(RDL)		; look at first name
 	or	a		; Receive or Get?
-	jp	z,READ1		; Receive
+	jp	z,READ12	; Receive
 
 	ld	a,'I'		; set state to send "I" packet
 	ld	(STATE),a
 
-;	jp	READ12		; [obs] [gnn] does not want this
-
-READ1:	;call	INIT		; clear the line and initialize the buffers
 READ12:	xor	a
 	ld	(CZSEEN),a	; clear the ^X/^Z flag initially
 	ld	hl,0
@@ -315,12 +330,13 @@ READ12:	xor	a
 	ld	(NUMRTR),hl	; set the number of retries to zero
 	ld	(PKTNUM),a	; set the packet number to zero
 	ld	(NUMTRY),a	; set the number of tries to zero
-	ld	a,(QUIETD)	; quiet display?
+READ11:	ld	a,(QUIETD)	; quiet display?
 	and	a
 	jr	nz,READ13	; yes, so don't write...
 	call	SCRNRT		; position cursor
 	ld	hl,0
 	call	NOUT		; write the number of retries
+	call	CLREOL		; erase to end of line
 	call	FLSCON
 READ13:	ld	a,(RDL)		; Get or Receive?
 	or	a
@@ -340,6 +356,7 @@ READ2:	ld	a,(QUIETD)	; noisy display?
 	call	SCRNP		; position cursor
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the current packet number
+	call	CLREOL		; erase to end of line
 	call	FLSCON
 READ21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Receive state?
@@ -388,7 +405,7 @@ READ5A:	ld	a,(REMTXT)	; doing a Remote command?
 	jp	z,KERMIT	; no autoreceives, so drop out
 	ld	de,AUTMES	; yes, tell the user what we're doing
 	call	PRTSTR
-	jp	READ1		; try another Receive (we get one
+	jp	READ12		; try another Receive (we get one
 				;  retry from the sender as the ^A is lost)
 
 READ6:	cp	'Y'		; simple ACK (from Remote command)?
@@ -507,7 +524,7 @@ RFILE1:	inc	a		; increment it
 	call	RPACK		; get a packet
 	jp	NAK		; trashed packet: NAK, retry
 	cp	'S'		; is it a Send Initiate packet?
-	jp	nz,RFILE2	; no, try next type
+	jr	nz,RFILE2	; no, try next type
 	ld	a,(OLDTRY)	; get the number of tries
 	cp	IMXTRY		; have we reached the maximum number of tries?
 	jp	m,RFIL12	; if not, proceed
@@ -536,7 +553,7 @@ RFIL12:	inc	a		; increment it
 	ret
 
 RFILE2:	cp	'Z'		; is it an EOF packet?
-	jp	nz,RFILE3	; no, try next type
+	jr	nz,RFILE3	; no, try next type
 	ld	a,(OLDTRY)	; get the number of tries
 	cp	MAXTRY		; have we reached the maximum number of tries?
 	jp	m,RFIL21	; if not, proceed
@@ -548,12 +565,12 @@ RFIL21:	call	TRYAGN
 	ret
 
 RFILE3:	cp	'F'		; start of file?
-	jp	nz,RFIL3B
+	jr	nz,RFIL3B
 	ld	c,a		; save packet type
 	ld	a,(REMTXT)	; doing a Remote server command?
 	or	a
 	ld	a,c		; restore packet type
-	jp	nz,RFIL3D	; if yes, same as X packet
+	jr	nz,RFIL3D	; if yes, same as X packet
 	call	COMPP		; expected packet?
 	jp	nz,NAK0		; no, NAK it and try again
 	call	COUNTP		; increment packet number modulo 64
@@ -563,7 +580,7 @@ RFILE3:	cp	'F'		; start of file?
 	ld	a,c
 	jr	nz,RFIL3A	; yes, don't open a file
 	call	GOFIL		; get a file to write to, and init output buffer
-	jp	ABORT
+	jp	ABORT		; on error, Abort
 RFIL3A:	ld	a,(NUMTRY)	; get the number of tries
 	ld	(OLDTRY),a	; save it
 	call	ACKP
@@ -577,7 +594,7 @@ RFIL3A:	ld	a,(NUMTRY)	; get the number of tries
 	ret
 
 RFIL3B:	cp	'X'		; start of 'file?', but not a file?
-	jp	nz,RFILE4
+	jr	nz,RFILE4
 RFIL3D:	call	COMPP		; expected packet?
 	jp	nz,NAK0		; no, NAK it and try again
 	call	COUNTP		; increment packet number modulo 64
@@ -622,7 +639,7 @@ RFIL3E:	ld	a,(NUMTRY)	; get the number of tries
 	ret
 
 RFILE4:	cp	'B'		; end of transmission?
-	jp	nz,RFILE5
+	jr	nz,RFILE5
 	call	COMPP		; expected packet?
 	jp	nz,NAK0		; no, NAK it and try again
 	xor	a		; no data (packet number already in ARGBLK)
@@ -783,6 +800,7 @@ ERMS10:	defb	'?Unable to receive data',CR,LF,0
 
 ; SEND command
 ; Here from: KERMIT
+; SEND1: alternate entry point from SERVER code.
 
 SEND:	ld	a,CMIFI		; parse an input file spec
 	ld	de,SFCB		; give the address for the FCB
@@ -796,8 +814,12 @@ SEND:	ld	a,CMIFI		; parse an input file spec
 	call	COMND		; get the text to end of the line
 	jp	KERMT3		; failure in reading buffer
 	ld	(REMLEN),a	; save length (may be zero)
+	jr	SEND11		; continue below
 
-	call	MFINIT		; initialize file search
+SEND1:	xor	a		; here from SERVER routine
+	ld	(REMLEN),a	;  so clear length (no local file name)
+	ld	(REMTXT),a
+SEND11:	call	MFINIT		; initialize file search
 	call	MFNAME		; handle (multi) files
 	jr	nc,SEND14	; got a valid file-name
 	ld	de,ERMS15
@@ -818,11 +840,12 @@ SEND14:	call	INIT		; clear the line and initialize the buffers
 	call	SCRNRT		; position cursor
 	ld	hl,0
 	call	NOUT		; write the number of retries
+	call	CLREOL		; erase to end of line
 	call	FLSCON
 SEND15:	ld	a,'1'		; reset to use single character checksum
 	ld	(CURCHK),a	; for startup
 	ld	a,'S'
-	ld	(STATE),a	; set the state to Receive Initiate
+	ld	(STATE),a	; set the state to Send Initiate
 	; ...
 
 ; SEND state table switcher
@@ -833,6 +856,7 @@ SEND2:	ld	a,(QUIETD)	; a quiet display?
 	call	SCRNP		; position cursor
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the packet number
+	call	CLREOL		; erase to end of line
 	call	FLSCON
 SEND21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Send state?
@@ -993,7 +1017,7 @@ SFILE1:	inc	a		; increment it
 
 	; copy local name into packet to send
 
-	ld	ix,FCB		; [*TODO: clear FN.VER bit?]
+	ld	ix,FCB		; TODO: clear FN.VER bit?
 	call	FCBS2		; convert file name to null-terminated string
 	ld	(DATPTR),hl
 	ld	hl,DATA
@@ -1017,6 +1041,7 @@ SFIL13:	ld	(ARGBLK+1),a	; store number of chars in file name
 	and	a
 	jr	nz,SFI13A	; yes, don't write
 	call	SCRFLN		; position cursor
+	call	CLREOL		; erase to end of line
 SFI13A:	ld	de,DATA		; print the file name though, in either case
 	call	PRTSTR
 	ld	a,(PKTNUM)	; get the packet number
@@ -1031,6 +1056,7 @@ SFI13A:	ld	de,DATA		; print the file name though, in either case
 	call	COMPP		; expected packet?
 	ret	nz		; if not, hold out for the right one
 SFIL14:	call	COUNTP		; count packet
+	;TODO: get remote filename here, if specified in ACK packet
 	ld	a,(NUMTRY)	; get the number of tries
 	ld	(OLDTRY),a	; save it
 	xor	a
@@ -1043,7 +1069,7 @@ SFIL14:	call	COUNTP		; count packet
 	jp	SFIL16		; error, go see if its EOF
                               	; got the chars, proceed
 	ld	(SIZE),a	; save the size of the data gotten
-	ld	a,'D'		; set the state to data send
+	ld	a,'D'		; set the state to Data Send
 	ld	(STATE),a
 	ret	
 
@@ -1143,10 +1169,10 @@ SDAT4:	ld	(de),a		; put the char in the data packet
 SDAT14:	cp	'X'		; desire abort of current file?
 	jr	nz,SDAT15	; no, just continue
 	ld	(CZSEEN),a	; yes, remember that
-	jp	SDAT16		;  and set EOF
+	jr	SDAT16		;  and set EOF
 SDAT15:	ld	a,(CZSEEN)	; also get control-Z flag
 	or	a		; check if either given
-	jp	z,SDAT12	; if neither given, continue
+	jr	z,SDAT12	; if neither given, continue
 SDAT16:	ld	a,'Z'		; change state to EOF
 	ld	(STATE),a
 	ret			; and return
@@ -1208,7 +1234,7 @@ SEOF14:	ld	a,'Z'		; EOF packet
 	call	RPACK		; get a packet
 	jp	R		; trashed packet don't change state, retry
 	cp	'Y'		; ACK?
-	jp	nz,SEOF2	; if not, try next
+	jr	nz,SEOF2	; if not, try next
 	call	COMPP		; expected packet?
 	ret	nz		; if not, hold out for the right one
 SEOF12:	call	COUNTP		; increment packet number modulo 64
@@ -1222,9 +1248,9 @@ SEOF12:	call	COUNTP		; increment packet number modulo 64
 
 	ld	a,(CZSEEN)	; desire abort of entire stream?
 	cp	'Z'
-	jp	z,SEOF13	; if so, just give up now
+	jr	z,SEOF13	; if so, just give up now
 	call	MFNAME		; get the next file
-	jp	c,SEOF13	; no more
+	jr	c,SEOF13	; no more
 	call	GETFIL		; and open it (assume success)
 	xor	a		; clear A
 	ld	(CZSEEN),a	; since we have not aborted this file
@@ -1232,12 +1258,13 @@ SEOF12:	call	COUNTP		; increment packet number modulo 64
 	ld	(STATE),a
 	ret
 
-SEOF13:	ld	a,'B'		; set the state to EOT
+SEOF13:	call	MFEND		; close directory
+	ld	a,'B'		; set the state to EOT
 	ld	(STATE),a
 	ret	
 
 SEOF2:	cp	'N'		; NAK?
-	jp	nz,SEOF3	; try and see if its an Error packet
+	jr	nz,SEOF3	; try and see if its an Error packet
 	call	UPDRTR		; update the number of retries
 	ld	a,(PKTNUM)	; get the present packet number
 	inc	a		; increment
@@ -1275,7 +1302,7 @@ SEOT1:	inc	a		; increment it
 	call	RPACK		; get a packet
 	jp	R		; trashed packet don't change state, retry
 	cp	'Y'		; ACK?
-	jp	nz,SEOT2	; if not, try next
+	jr	nz,SEOT2	; if not, try next
 	call	COMPP		; expected packet?
 	ret	nz		; if not, hold out for the right one
 SEOT12:	call	COUNTP		; increment packet number modulo 64
@@ -1283,12 +1310,12 @@ SEOT12:	call	COUNTP		; increment packet number modulo 64
 	ld	(OLDTRY),a	; save it
 	xor	a
 	ld	(NUMTRY),a	; reset the number of tries
-	ld	a,'C'		; set the state to File Send
+	ld	a,'C'		; set the state to Complete
 	ld	(STATE),a
 	ret
 
 SEOT2:	cp	'N'		; NAK?
-	jp	nz,SEOT3	; is it error?
+	jr	nz,SEOT3	; is it error?
 	call	UPDRTR		; update the number of retries
 	ld	a,(PKTNUM)	; get the present packet number
 	inc	a		; increment
@@ -1421,7 +1448,7 @@ RPAR1:	inc	hl		; advance to next
 ; (to ret at end)
 ;
 ; SPAR - routine to decode parameters received from the remote end.
-; Called by RINIT, SINIT
+; Called by RINIT, SINIT, SERVER
 ;
 ; Entry: A = number of databytes in packet
 ;        HL = pointer to "data" part of packet
@@ -1781,24 +1808,21 @@ PTCHR9:	ld	de,ERMS11	; "?Disk full"
 	push	de		; save pointer
 	call	ERROR3		; put it on the error line
 	pop	de		; restore pointer
-	ld	hl,DATA		; where to put the message for "E" packet
 	ld	a,(ARGBLK)	; get packet-number
 	call	COUNTP		; increment it
 	ld	(ARGBLK),a	; as packet to send
-	xor	a		; zero length of packet data
-	ld	(TEMP1),a
+SNDERR:	ld	hl,DATA		; where to put the message for "E" packet
+	ld	c,0		; zero length of packet data
 PTCH9A:	ld	a,(de)		; get a character to copy
 	cp	CR		; no more to copy?
-	jp	z,PTCH9B	; yes, we can send the packet
+	jr	z,PTCH9B	; yes, we can send the packet
 	ld	(hl),a		; no, copy the character
 	inc	de		; and increment source/dest pointers
 	inc	hl
-	ld	a,(TEMP1)	; get character count
-	inc	a		;  and increment it
-	ld	(TEMP1),a
-	jp	PTCH9A		; copy entire error message
+	inc	c		; increment character count
+	jr	PTCH9A		; copy entire error message
 PTCH9B:	ld	(hl),0		; put in a zero
-	ld	a,(TEMP1)	; get number of characters in the message
+	ld	a,c		; get number of characters in the message
 	ld	(ARGBLK+1),a	;  and store as number of packet data chars
 	ld	a,'E'		; make it an Error packet
 	call	SPACK		; send the Error packet
@@ -1983,6 +2007,7 @@ GOFIL0:	ld	ix,FCB2		; put result in FCB2 (will open for write)
 	and	a
 	jr	nz,GOFI70	; yes, so skip it
 	call	SCRFLN		; position cursor
+	call	CLREOL		; erase to end of line
 GOFI70:	ld	de,DATA		; print the file name
 	ld	a,(GTRXFL)	; are we doing a Get or Receive?
 	and	a
@@ -2698,8 +2723,9 @@ INCHR7:	call	CLRTOP		; clear screen and home cursor
 	ld	a,(TAKFLG)	; Take-file in progress?
 	and	1
 	call	nz,CLSETK	; yes, close it and reset TAKE-flag
-				; so all processing is halted
-	jp	KERMIT		; then re-enter kermit
+	xor	a		;  so all processing is halted
+	ld	(SRVFLG),a	; reset also the Server Mode flag
+	jp	KERMIT		;  then re-enter kermit
 
 ; Routine to calculate a CRC-CCITT for a string.
 ;
@@ -2891,6 +2917,7 @@ UPDRTR:	ld	hl,(NUMRTR)
 	call	SCRNRT		; position cursor
 	ld	hl,(NUMRTR)
 	call	NOUT		; write the number of retries
+	call	CLREOL		; erase to end of line
 	jp	FLSCON		; flush output and return
 
 ; This routine prints parity warnings. All registers are saved except for A.

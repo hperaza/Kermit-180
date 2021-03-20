@@ -114,6 +114,8 @@
 
 	.Z80
 
+	ident	/14/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	FCB.INC
@@ -134,7 +136,7 @@
 	extrn	EXTERN,SPDHLP,PORT,FNBUF,LOGFCB,FCB,PAUSIT,BUFLEN
 	extrn	CURDEV,CURDIR
 
-	extrn	MITVER,PKTVER,REMVER,SERVER,TTVER,SYSVER,CMDVER
+	extrn	MITVER,PKTVER,REMVER,SRVVER,TTVER,SYSVER,CMDVER
 	extrn	UTLVER,DATVER,VERSION
 
 	cseg
@@ -349,11 +351,11 @@ STSNTB:	defb	4		; Four entries
 	defw	STSPAC
 	defb	7, 'PADDING',0
 	defw	STSPAD
-	defb	15, 'START-OF-PACKET',0
+	defb	15,'START-OF-PACKET',0
 	defw	STSSOP
 	defb	13,'PACKET-LENGTH',0
 	defw	STSPKS
-;	defb	9,'CHECKTYPE',0
+;	defb	9, 'CHECKTYPE',0
 ;	defw	STSCKT
 
 STSHLP:	defb	CR,LF,'PAD-CHAR to define the pad character to use'
@@ -816,24 +818,7 @@ BAUD:	ld	hl,(SPDTAB)	; get pointer to speed table
 
 ; SET PORT and SET LINE commands
 
-PRTSET:
- IF 0
-	ld	hl,(PRTTAB)	; get pointer to port table
-	ld	a,h
-	or	l		; test for NULL
-	jp	z,NOTIMP	; not supported if pointer was null.
-	ex	de,hl		; move port table address to DE
-	ld	hl,(PRTHLP)	; get pointer to port help text
-	call	KEYCMD
-	push	de		; save selected port entry
-	call	CFMCMD		; confirm...
-	pop	hl		; restore table address to HL
-	ld	(PORT),de	; save link device name
-	ld	a,c
-	ld	(PORT+2),a	; and unit
-	call	SYSPRT		; go do port stuff
- ELSE
-	ld	de,FCB
+PRTSET:	ld	de,FCB
 	ld	a,CMIFIN	; get "file-spec" silently [TODO: CMDEV]
 	call	COMND
 	jp	PRTS1
@@ -860,7 +845,6 @@ PRTS1:	ld	a,(FCB+F.ATTR)
 PRTS2:	ld	de,ERMS32	; "invalid device"
 	call	PRTSTR		; print error message
 	jp	KERMIT		; and die
-  ENDIF
 
 ; Subroutines for SET subcommands
 
@@ -1378,7 +1362,7 @@ VERTAB:	defw	MITVER		; KMIT
 	defw	COMVER		; KCOM
 	defw	PKTVER		; KPKT
 	defw	REMVER		; KREM
-	defw	SERVER		; KSER
+	defw	SRVVER		; KSER
 	defw	TTVER		; KTT
 	defw	SYSVER		; KSYS
 	defw	CMDVER		; KCMD

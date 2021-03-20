@@ -121,6 +121,8 @@
 
 	.Z80
 
+	ident	/15/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	QIO.INC
@@ -312,6 +314,9 @@ SYSMSG:	db	'on RSX',0,'80 V',0
 ; System-dependent termination.
 
 SYSEXIT:
+	call	CLOSEF		; paranoia check (a file may remain open
+	call	CLOSE2		;  after an Error or Abort condition)
+	call	MFEND
 	call	TTFLSH		; flush terminal output
 	ld	a,(MDMSET)
 	or	a		; comm line attached?
@@ -1144,8 +1149,7 @@ DIR17:	; done with directory, display free space remaining on device
 DIR18:	jp	KERMIT		; return to kermit
 
 DIRERR:	call	MFEND		; close directory
-DIRER1	call	CLOSYS
-
+	call	CLOSYS
 
 	;*TODO: display error message
 
@@ -1214,7 +1218,7 @@ DIR25B:	ld	c,e
 	xor	a
 	ld	(de),a		; end string with a null
 	pop	de
-	jp	PRTSTR		; and siplay it
+	jp	PRTSTR		; and display it
 
 ; Collect disk block usage statistics.
 
@@ -1508,7 +1512,7 @@ ERA1:	ld	de,ERMS15	; "unable to find file"
 	jp	KERMIT
 
 ERMS15:	db	CR,LF,'?Unable to find file',0
-;;;INMS18:	db	CR,LF,'File(s) erased',0			;;;;;;;;
+;;;INMS18:	db	CR,LF,'File(s) erased',0	;;;
 
 ; TYPE - type a file or files to the console.  
 ;

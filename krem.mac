@@ -104,6 +104,8 @@
 
 	.Z80
 
+	ident	/14/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 
@@ -561,7 +563,7 @@ REMC0F:	xor	a
 	ld	(CURCHK),a
 REMCM0:	ld	a,'I'		; init state
 	ld	(STATE),a
-	call	SINIT		; do sendinit with I packet (??)
+	call	SINIT		; do Send-Init with I packet (??)
 	ld	a,(STATE)	; now see if we are in the 'X' state
 	cp	'X'
 	jp	z,REMCO0	; yup, all is in order
@@ -674,9 +676,9 @@ REMC2B:	cp	'S'		; Send-init?
 	jp	nz,REMC2C	; no
 	call	RINI2A		; initialize parameters
 	ld	a,(STATE)	; get state
-	cp	'A'		; if abort,
+	cp	'A'		; if Abort,
 	jp	z,KERMIT	;  go back to main command loop
-	ld	a,'X'		; set state to text-display
+	ld	a,'X'		; set state to Text-Display
 	ld	(STATE),a
 	jp	READ2		; get more packets
 REMC2C:	cp	'N'		; NACKed packet?
@@ -738,61 +740,61 @@ REMCLI:	xor	a		; zero accumulated length
 ; [MF][12]octal numbers prefixed with "\" but this isn't used much in remote
 ; [MF][12]commands anyway.
 ;
-;remcl0:	mvi	a,cmtxt		; We get arbitrary text
-;	call	comnd		; from the command-line
-;	jmp	kermt3		; We couldn't get any.
-;	ora	a		; Anything given?
-;	jz	remcl1		; No, done
-;	push	b		; Save BC
-;	mov	c,a		; Save length
-;	lda	rcl		; Get accumulated length
-;	add	c		; plus current word length
-;	adi	1		; plus a space
-;	sta	rcl		; and save accumulated length
-;	mvi	a,space		; Put in a space separator
-;	stax	d		; ...
-;	inx	d		; Increment pointer
-;	pop	b		; Restore BC
-;	jmp	remcl0		; Get text to end-of-line
-;remcl1:	lda	rcl		; Get accumulated length
-;	ora	a		; Anything typed?
-;	rz		; No
-;	dcr	a		; Yes, don't count final space
-;	push	psw		; Save count
-;	dcx	d		; Point to final space
-;	xra	a		; Zap it
-;	stax	d		; ...
-;	pop	psw		; Restore count
+;remcl0:	ld	a,CMTXT		; we get arbitrary text
+;	call	COMND		;  from the command-line
+;	jp	KERMT3		; we couldn't get any
+;	oa	a		; anything given?
+;	jr	z,remcl1	; no, done
+;	push	bc		; save BC
+;	ld	c,a		; save length
+;	ld	a,(RCL)		; get accumulated length
+;	add	a,c		;  plus current word length
+;	inc	a		;   plus a space
+;	ld	(RCL),a		; and save accumulated length
+;	ld	a,SPACE		; put in a space separator
+;	ld	(de),a
+;	inc	de		; increment pointer
+;	pop	bc		; restore BC
+;	jp	remcl0		; get text to end-of-line
+;remcl1:	ld	a,(RCL)		; get accumulated length
+;	oa	a		; anything typed?
+;	ret	z		; no
+;	dec	a		; yes, don't count final space
+;	push	af		; save count
+;	dec	de		; point to final space
+;	xor	a		; zap it
+;	ld	(de),a
+;	pop	af		; restore count
 ;
 ; [MF][12]Simplified code follows
 
 REMCL0:	call	CMGTCH		; get a character from the user
 	and	7Fh		; turn off minus bit
 	cp	CR		; if end-of-line,
-	jp	z,REMCLX	;  we're done
+	jr	z,REMCLX	;  we're done
 	cp	LF
-	jp	z,REMCLX
+	jr	z,REMCLX
 	ld	(de),a		; else store the character
 	inc	b		;  and count it
 	inc	de		; increment character buffer pointer
 	cp	ESC		; is character an <ESC>?
-	jp	z,REMCL2	; yes
+	jr	z,REMCL2	; yes
 	cp	FF		; an <FF>?
-	jp	z,REMCL1	; yes, diddle command buffer pointer
+	jr	z,REMCL1	; yes, diddle command buffer pointer
 	cp	'?'		; a "?"?
-	jp	nz,REMCL0	; no, just get more characters
+	jr	nz,REMCL0	; no, just get more characters
 REMCL1:	push	hl		; protect HL
 	ld	hl,(CMDPTR)	; get CMGTCH's character pointer
 	inc	hl		;  and reverse the action at CMGTC4
-				; since we don't need a "confirm" and
-				; infinite loops are beaucoup bad news
+				;   since we don't need a "confirm" and
+				;    infinite loops are beaucoup bad news
 	ld	(CMDPTR),hl
 	pop	hl		; restore HL
 REMCL2:	push	af		; save the character
 	xor	a		; zero the action flag so we get input
 	ld	(CMAFLG),a	;  to end-of-line without special action
 	pop	af		; restore the character
-	jp	REMCL0		; get more characters
+	jr	REMCL0		; get more characters
 REMCLX:	ld	a,b		; get accumulated text length
 	ld	(RCL),a		; and remember it
 	ret			; return

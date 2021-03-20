@@ -121,6 +121,10 @@
 ;       extracted from CPMBASE.M80 version 3.9; modifications are described in
 ;       the accompanying .UPD file.
 
+	.Z80
+
+	ident	/14/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	FCB.INC

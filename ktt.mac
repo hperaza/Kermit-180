@@ -139,6 +139,8 @@
 
 	.Z80
 
+	ident	/13/
+
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	FCB.INC
@@ -239,7 +241,7 @@ XMT3:	ld	a,(EOFLAG)	; have we hit end of file?
 	and	a
 	jp	nz,XMTEX	; yup, so quit
 	xor	a
-	ld	(REPCNT),a	; clear the host prompt chars.counter
+	ld	(REPCNT),a	; clear the host prompt chars counter
 XMT2:	call	RD1CHL		; read a character from the line
 	and	7Fh		; set flags
 	jp	nz,XMT4		; not zero => we have a character from host
@@ -248,7 +250,7 @@ XMT2:	call	RD1CHL		; read a character from the line
 	call	SELMDM
 	pop	af
 	and	7Fh		; stip parity (should not be there)
-	jp	nz,XMT2A	; if a null, try again
+	jr	nz,XMT2A	; if a null, try again
 	ld	a,(STRCNT)	; if the string length is zero, don't wait
 	and	a
 	jp	z,XMT1		; so loop back again
@@ -257,12 +259,12 @@ XMT2:	call	RD1CHL		; read a character from the line
 XMT2A:	cp	CTRLC		; do we want to abort?
 	jp	z,XMTEX		; in which case drop through to connect mode
 	cp	CTRLZ		; if control-Z exit back to command loop
-	jp	nz,XMT2B	; else try for other characters
+	jr	nz,XMT2B	; else try for other characters
 	call	CLOSEF		; close file before exiting to command loop
 	jp	KERMIT
 
 XMT2B:	cp	CR		; a CR => resend last line
-	jp	nz,XMT2		; nope, then ignore it
+	jr	nz,XMT2		; nope, then ignore it
 	ld	a,1
 	ld	(REXBFL),a	; else we want to resend the line
 	jp	XMT1
@@ -282,7 +284,7 @@ XMT5:	call	RD1CHL		; else see if XOFF comming
 	cp	CTRLC		; control-C == abort & play terminal
 	jp	z,XMTEX
 	and	a		; anything else?
-	jp	z,XMT5		; loop again
+	jr	z,XMT5		; loop again
 
 XMT6:	ld	e,a		; save it for a while
 	ld	a,(REPCNT)	; see if this character matches with one in buffer
@@ -311,16 +313,16 @@ XMT1CH:	call	SELMDM		; just in case it uses it
 	ld	a,CR		; load up a carriage return
 XMT1C1:	call	GET1XC		; get the character to send
 	cp	LF		; don't send line feeds
-;	jp	z,XMT1C1
+;	jr	z,XMT1C1
 	cp	CTRLZ		; if control-Z, then we are at end of the file
 	jp	z,XMTEX		; so close the file and drop into TELCON
 	cp	20h		; control character?
 	jp	p,XMT11		; no, so OK
 	cp	CR		; CR, and tabs OK to send
-	jp	z,XMT11
+	jr	z,XMT11
 	cp	TAB
-	jp	z,XMT11
-	jp	XMT1C1		; else try for another character
+	jr	z,XMT11
+	jr	XMT1C1		; else try for another character
 
 XMT11:	call	SETPAR		; else set parity, etc
 	push	af		; we want to keep this for a while

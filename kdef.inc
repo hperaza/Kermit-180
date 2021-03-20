@@ -78,7 +78,7 @@
 
 ; Symbolic Definitions for some ASCII characters
 
-VERNO	EQU	12	; minor version number
+VERNO	EQU	20	; minor version number
 REVNO	EQU	0	; revision level, 0-26 yields A-Z
 
 SOH	equ	01o	; ASCII SOH (Control-A)

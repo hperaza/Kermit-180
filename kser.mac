@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 3, 19-Mar-2021 by H. Peraza: preliminary Server Mode loop.
+;
 ; edit 2, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -33,12 +35,144 @@
 
 	.Z80
 
+	ident	/03/
+
 	include	KDEF.INC
 
-	public	SERVER
+	public	SRVVER,SERVER
+
+	extrn	KERMIT,CLRTOP,RPACK,SPACK,NAK,NAK0,ACKP,SEND1,READ1
+	extrn	SNDERR,SPAR,CSRPOS
+
+	extrn	SRVFLG,ARGBLK,DATA,NUMPKT,PKTNUM,NUMRTR,NUMTRY,CURCHK
+	extrn	SFCB,QUIETD
+
+	extrn	PFN
 
 	cseg
 
-SERVER:	db	'KSER  (2) 27-Dec-2020',0	; name, edit number, date
+SRVVER:	db	'KSER  (3) 20-Mar-2021',0	; name, edit number, date
+
+; SERVER - Wait for and process Kermit packet(s).
+
+SERVER:	ld	a,(QUIETD)
+	or	a		; quiet display?
+	ld	bc,0
+	call	z,CSRPOS	; no, home cursor
+	ld	hl,0
+	ld	(NUMPKT),hl	; set the number of packets to zero
+	ld	(NUMRTR),hl	; set the number of retries to zero
+	xor	a
+	ld	(PKTNUM),a	; set the packet number to zero
+	ld	(NUMTRY),a	; set the number of tries to zero
+	ld	a,'1'
+	ld	(CURCHK),a	; start with single-character checksum
+	call	RPACK		; wait for packet
+	jp	NAK1		; trashed packet: NAK, retry
+	cp	'I'		; Info packet?
+	jr	nz,SERV1	; no
+	ld	a,(ARGBLK+1)	; get the number of data bytes
+	ld	hl,DATA		; pointer to the data
+	call	SPAR		; read in the data (decode what they want)
+	call	ACKP		; ACK the packet
+	jp	SERVER		; and restart the server
+
+NAK1:	call	NAK		; NAK the packet
+	jp	SERVER		; and restart the server
+
+; Process the packet
+
+SERV1:	cp	'S'		; Send-Initiate packet?
+	jr	nz,SERV2	; no
+	jp	READ1		; else receive file
+
+SERV2:	cp	'R'		; Receive-Initiate packet?
+	jr	nz,SERV3	; no
+	ld	hl,DATA		; get a pointer to the data
+	ld	ix,SFCB		; place result in source FCB
+	call	PFN		; parse filename
+	jp	SEND1		; send file
+
+SERV3:	cp	'K'		; Kermit command?
+	jr	nz,SERV4	; no
+
+	;...TODO
+
+	jp	SERV6
+
+SERV4:	cp	'C'		; Host command?
+	jr	nz,SERV5	; no
+	jp	SERV6		; and we'll not support them for security reasons
+
+SERV5:	cp	'G'		; Generic command?
+	jr	nz,SERV6	; no, error
+	ld	a,(ARGBLK+1)	; get length
+	ld	c,a		; keep a copy in register C
+	or	a		; any command?
+	jr	z,SERV6		; no, error
+	ld	hl,DATA
+	ld	a,(hl)		; get command char
+	dec	c		; decrement length
+	cp	'F'		; Finish?
+	jp	nz,SERV51	; no
+
+	;...TODO: restore orig. directory?
+
+	call	ACKP		; ACK the command
+	call	CLRTOP		; clear screen
+	xor	a
+	ld	(SRVFLG),a	; exit server mode
+	jp	KERMIT		; back to command mode
+
+SERV51:	cp	'C'		; Change directory?
+	jp	nz,SERV52	; no
+
+	;...TODO
+
+SERV52:	cp	'D'		; Directory?
+	jp	nz,SERV53	; no
+
+	;...TODO
+
+SERV53:	cp	'U'		; Disk Usage?
+	jp	nz,SERV54	; no
+
+	;...TODO
+
+SERV54:	cp	'E'		; Erase file?
+	jp	nz,SERV55	; no
+
+	;...TODO
+
+SERV55:	cp	'T'		; Type file?
+	jp	nz,SERV56	; no
+
+	;...TODO
+
+SERV56:	cp	'R'		; Rename?
+	jp	nz,SERV57	; no
+
+	;...TODO
+
+SERV57:	cp	'W'		; Who?
+	jp	nz,SERV58	; no
+
+	;...TODO
+
+SERV58:	cp	'M'		; Short Message?
+	jp	nz,SERV59	; no
+
+	;...TODO
+
+SERV59:	cp	'L'		; Logout/Bye?
+	jp	nz,SERV6	; no, and that's about it
+
+	;...TODO
+
+SERV6:	ld	de,ERMS1
+	call	SNDERR		; send Error packet
+	jp	SERVER		; restart server
+
+ERMS1:	defb	'?Invalid command',CR,LF,0
 
 	end
