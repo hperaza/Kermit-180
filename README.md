@@ -6,7 +6,7 @@ Kermit-180 has been tested on a P112 (Z180) machine running RSX180 and on a Z280
 |Capability|Implemented|
 |--|--|
 |Local operation|Yes|
-|Remote operation|Partial, Auto-receive only|
+|Remote operation|Yes|
 |Login scripts|Yes, limited|
 |Transfer text files|Yes|
 |Transfer binary files|Yes|
@@ -26,7 +26,7 @@ Kermit-180 has been tested on a P112 (Z180) machine running RSX180 and on a Z280
 |Debug logging|No|
 |Session logging|Yes|
 |Raw file transmit|Yes|
-|Act as server|No|
+|Act as server|Yes|
 |Talk to server|Yes|
 |Advanced commands for servers|Yes|
 |Command/init files|Yes|
