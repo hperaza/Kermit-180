@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 15, 6-Jan-2021 by H. Peraza: use PRTERR to output error messages.
+;
 ; edit 14, 6-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Null now marks the end of strings, so we can use SYSLIB routines.
 ;       Replaced SET USER and SET DEFAULT-DISK commands by a single SET
@@ -127,6 +129,7 @@
 	extrn	KEYCMD,COMND,KERMIT,PRTSTR,SELCON,OUTCON,ESCPR
 	extrn	SETPAR,CFMCMD,NOUT,PRCRLF,SYSSPD,SYSPRT,CLRTOP
 	extrn	SELMDM,OUTMDM,GETCT,DEVSTR,DIRSTR,FCBSTR,ALUN
+	extrn	PRTERR
 
 	extrn	AUTORC,CHKTYP,NUMBER,MAXBSC,BUFSEC,STBUFF,DBGFLG
 	extrn	TACFLG,STRCNT,SNDSOP,SPSIZ,SDCKT,RCVSOP,RPSIZ
@@ -288,10 +291,10 @@ SBF1:	add	hl,de		; compute buffer size in bytes
 	jp	KERMIT
 
 SETBU1:	ld	de,ERMS25
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT
 
-ERMS25:	db	CR,LF,'?Invalid BUFFER-SIZE parameter',0
+ERMS25:	db	'?Invalid BUFFER-SIZE parameter',0
 
 ; SET DEFAULT and CD commands
 
@@ -333,10 +336,10 @@ SETDI3:	;*TODO: ensure directory exists on CURDEV?
 	jp	KERMIT		; all done
 
 SETDI4:	ld	de,ERMS32	; "invalid device"
-	call	PRTSTR		; print error message
+	call	PRTERR		; print error message
 	jp	KERMIT		; and die
 
-ERMS32:	db	CR,LF,'?Invalid device',0
+ERMS32:	db	'?Invalid device',0
 
 ; SET SEND command.  Sort of supported
 
@@ -398,15 +401,15 @@ STSPKS:	call	GETNP		; get number into HL
 				;  GETNP puts low-order bits in A,
 				;   in case long packets are implemented
 	pop	hl		; restore number
-	ld	de,ERMS26	; packet length too long error
 	jp	nc,STSPK1
 	ld	a,l
 	ld	(SPSIZ),a	; save as default send packet length
 	jp	KERMIT
-STSPK1:	call	PRTSTR
+STSPK1:	ld	de,ERMS26	; packet length too long error
+	call	PRTERR
 	jp	KERMIT		; error exit
 
-ERMS26:	db	CR,LF,'?Packet too long',0
+ERMS26:	db	'?Packet too long',0
 
 ; SET SEND CHECKTYPE command. Accepts 1,2 or 3
 
@@ -414,6 +417,7 @@ STSCKT:	call	GETNP		; get a number
 	cp	4		; if more than 3 then error
 	jp	nz,STSCK1
 STSCK2:	ld	de,ERMS27	; checktype wrong
+	call	PRTERR
 	jp	KERMIT
 STSCK1:	cp	0		; error also for null
 	jp	z,STSCK2
@@ -421,7 +425,7 @@ STSCK1:	cp	0		; error also for null
 	ld	(SDCKT),a	; save as default send checktype
 	jp	KERMIT
 
-ERMS27:	db	CR,LF,'?Invalid Checktype',0
+ERMS27:	db	'?Invalid Checktype',0
 
 ; SET RECEIVE command
 
@@ -502,6 +506,7 @@ STRCKT:	call	GETNP		; get a number
 	cp	4		; if more than 3 then error
 	jp	nz,STRCK1
 STRCK2:	ld	de,ERMS27	; checktype wrong
+	call	PRTERR
 	jp	KERMIT
 STRCK1:	cp	0		; error also for null
 	jp	z,STRCK2
@@ -843,7 +848,7 @@ PRTS1:	ld	a,(FCB+F.ATTR)
 	jp	KERMIT
 
 PRTS2:	ld	de,ERMS32	; "invalid device"
-	call	PRTSTR		; print error message
+	call	PRTERR		; print error message
 	jp	KERMIT		; and die
 
 ; Subroutines for SET subcommands

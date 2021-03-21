@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 16, 21-Mar-2021 by H. Peraza: close all files at exit. Use PRTERR
+;       routine to output error messages. New get/send/server screen layout.
+;
 ; edit 15, 9-Jan-2021 by H. Peraza: converted to Z80, rewritten almost
 ;       completely for the RSX180/280 system. All I/O is now done here,
 ;       so there are no more system calls (previously BDOS calls) scattered
@@ -121,7 +124,7 @@
 
 	.Z80
 
-	ident	/15/
+	ident	/16/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -148,7 +151,7 @@
 	public	ERMS15,SFCB,HIDEFS
 
 	extrn	KERMIT,COMND,NOUT,GETFIL,INBUF,PRCRLF,PRNFL,STRLEN
-	extrn	STRCPY,CPYNAM,RSKP,DEVSTR,DIRSTR,OUTPRN
+	extrn	STRCPY,CPYNAM,RSKP,DEVSTR,DIRSTR,OUTPRN,PRTERR
 
 	extrn	VERSION,BANNER,RSXVER,CURDEV,CURDIR,$MEMRY,BUFADR
 	extrn	BUFSEC,BUFLEN,BUFPNT,MAXBSC,DBGFLG,HOSTNM,PORT
@@ -174,7 +177,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (15)  9-Jan-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (16) 21-Mar-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -361,26 +364,28 @@ D1:	pop	de
 ;    1 |
 ;    2 |                Kermit-180 V4.0 on RSX180 Vx.y (hostname)
 ;    3 |
-;    4 |Number of packets: ____
-;    5 |Number of retries: ____
-;    6 |File name: ____________
-;    7 |<error>...
-;    8 |<status>...
-;    9 |RPack: ___(if debugging)...
+;    4 |  Packet number: ____
+;    5 |        Retries: ____
+;    6 |      File name: ____________
+;    7 |
+;    8 |         Status: ______
+;    9 |     Last error: ______
 ;   10 |
-;   11 |SPack: ___(if debugging)...
+;   11 |          RPack: ___(if debugging)...
 ;   12 |
-;   13 |Kermit-180 SY0:[USER]>  (when finished)
+;   13 |          SPack: ___(if debugging)...
+;   14 |
+;   15 |Kermit-180 SY0:[USER]>  (when finished)
 
 HDLIN	equ	2
-NPPOS	equ	4*100h+20
-RTPOS	equ	5*100h+20
-FNPOS	equ	6*100h+12
-ERRLIN	equ	7
-STLIN	equ	8
-RPLIN	equ	9
-SPLIN	equ	11
-PRPLIN	equ	13
+NPPOS	equ	4*100h+18
+RTPOS	equ	5*100h+18
+FNPOS	equ	6*100h+18
+ERPOS	equ	9*100h+18
+STPOS	equ	8*100h+18
+RPKPOS	equ	11*100h+18
+SPKPOS	equ	13*100h+18
+PRPLIN	equ	15
 
 ; Set up screen display for file transfer
 ; Called with kermit version in DE
@@ -398,22 +403,34 @@ SYSSCR:	call	CLRTOP		; clear screen
 	pop	de		; get banner string
 	call	PRTSTR		; print it
 	ld	de,OUTLIN	; print field names
-	call	PRTSTR
+	call	XYSTR
 	ld	a,(DBGFLG)	; is debugging enabled?
 	or	a
 	ret	z		; finished if no debugging
 	inc	de		; set up debugging fields
-	jp	PRTSTR
+XYSTR:	ld	a,(de)		; get column
+	or	a		; zero?
+	ret	z		; yes, return
+	ld	c,a		; get column into reg C
+	inc	de		; advance pointer
+	ld	a,(de)		; get row
+	ld	b,a		; into reg B
+	push	de
+	call	CSRPOS		; position cursor
+	pop	de
+	inc	de		; point to message
+	call	PRTSTR		; output string
+	inc	de		; skip trailing null
+	jr	XYSTR		; and loop to process next
 
-OUTLIN:	defb	CR,LF
-	defb	CR,LF,'Number of packets:'
-	defb	CR,LF,'Number of retries:'
-	defb	CR,LF,'File name:'
+OUTLIN:	defb	3,4,'Packet number:',0
+	defb	9,5,'Retries:',0
+	defb	7,6,'File name:',0
+	defb	10,8,'Status:',0
+	defb	6,9,'Last error:',0
 	defb	0
-	defb	CR,LF,LF	; debugging messages
-	defb	CR,LF,'Rpack:'
-	defb	CR,LF		; blank line in case of long packet
-	defb	CR,LF,'Spack:'
+	defb	11,11,'Rpack:',0
+	defb	11,13,'Spack:',0
 	defb	0
 
 SCRNP:	ld	bc,NPPOS	; position cursor to output number of packets
@@ -427,19 +444,19 @@ SCRFLN:	ld	bc,FNPOS	; position cursor to output file name
 CLREOL:	ld	de,TK		; erase line
 	jp	PRTSTR
 
-SCRERR:	ld	bc,ERRLIN*100h+1
+SCRERR:	ld	bc,ERPOS
 	call	CSRPOS		; position cursor on error line
 	jp	CLREOL		; erase line
 
-SCRST:	ld	bc,STLIN*100h+1
+SCRST:	ld	bc,STPOS
 	call	CSRPOS		; position cursor on status line
 	jp	CLREOL		; erase line
 
-RPPOS:	ld	bc,RPLIN*100h+8
+RPPOS:	ld	bc,RPKPOS
 	call	CSRPOS		; position cursor on read packet line
 	jp	CLREOL		; erase line
 
-SPPOS:	ld	bc,SPLIN*100h+8
+SPPOS:	ld	bc,SPKPOS
 	call	CSRPOS		; position cursor on sent packet line
 	jp	CLREOL		; erase line
 
@@ -450,7 +467,8 @@ SCREND:	ld	a,(DBGFLG)
 	jr	z,SCR1ND
 	ld	bc,PRPLIN*100h+1; debugging in use
 	jr	SCR2ND
-SCR1ND:	ld	bc,RPLIN*100h+1	; no debugging
+SCR1ND:	ld	bc,RPKPOS	; no debugging
+	ld	c,1
 SCR2ND:	call	CSRPOS		; position cursor
 CLREOS:	ld	de,TJ
 	jp	PRTSTR		; erase to end of screen
@@ -1508,11 +1526,11 @@ ERA:	ld	a,CMIFI		; parse a file-spec
 ;;;	ld	de,INMS18	; "File(s) erased"
 
 ERA1:	ld	de,ERMS15	; "unable to find file"
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT
 
-ERMS15:	db	CR,LF,'?Unable to find file',0
-;;;INMS18:	db	CR,LF,'File(s) erased',0	;;;
+ERMS15:	db	'?Unable to find file',0
+;;;INMS18:	db	'File(s) erased',0	;;;
 
 ; TYPE - type a file or files to the console.  
 ;
@@ -1619,7 +1637,7 @@ TYPEX0:	call	CLOSEF		; close the file
 ; error for file not found (or access denied)
 
 TYPE02:	ld	de,NOFILE	; say no file name (it's invalid)
-	call	PRTSTR
+	call	PRTERR
 	call	MFEND		; close directory
 	xor	a
 	ld	(PRNFL),a	; clear the flag
@@ -1710,7 +1728,7 @@ COPY:	ld	a,CMOFI		; parse source file name, no wildcards
 	jp	KERMIT		; no? try another command
 
 	ld	de,SAMEMS	; if they are, it's a daft thing to do
-	call	PRTSTR		; tell user
+	call	PRTERR		; tell user
 	jp	KERMIT		; and try again
 
 	ld	ix,FCB
@@ -1721,14 +1739,14 @@ COPY:	ld	a,CMOFI		; parse source file name, no wildcards
 	call	GETFIL		; open source file
 	jp	nc,COPY4
 	ld	de,NOFILE	; assume file not found
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; and die
 
 COPY4:	call	CREATF		; create target file
 	jr	nc,COPY5
 	call	CLOSEF		; close source file
 	ld	de,ERMS12	; display error message
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; and die
 
 COPY5:	call	INBUF		; start of copy proper: get bufferful
@@ -1765,13 +1783,13 @@ COPY8:	push	af		; save error code
 	call	CLOSE2		; close target file, ignore errors
 	pop	af		; restore error code
 COPY9:	ld	de,ERMS17	; say disk is full
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT
 
-NOFILE:	db	CR,LF,'?File not found',0
-SAMEMS:	db	CR,LF,'?Source and destination files are the same',0
-ERMS12:	db	CR,LF,'?Directory full',0
-ERMS17:	db	CR,LF,'?Disk full',0
+NOFILE:	db	'?File not found',0
+SAMEMS:	db	'?Source and destination files are the same',0
+ERMS12:	db	'?Directory full',0
+ERMS17:	db	'?Disk full',0
 
 ; RENAME - Rename a file
 
@@ -1821,11 +1839,11 @@ RENAME:	ld	a,CMOFI		; get nonwild filename
 ;;	ld	de,NOFILE	; inform the user
 ;;	ld	de,ERMS31	; file exists
 RENAM2:	ld	de,ERMS16	; no, complain
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; and start over
 
-;;ERMS31:	db	CR,LF,'?File already exists',0
-ERMS16:	db	CR,LF,'?Unable to rename file',0
+;;ERMS31:	db	'?File already exists',0
+ERMS16:	db	'?Unable to rename file',0
 
 ; Multi-file access subroutines, allows processing of multiple files
 ; (i.e. *.ASM;*) from disk.

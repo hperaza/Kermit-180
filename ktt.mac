@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 14, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
+;
 ; edit 13, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Low-level log file file I/O routines are now in the KSYS.MAC module.
 ;
@@ -139,7 +141,7 @@
 
 	.Z80
 
-	ident	/13/
+	ident	/14/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -151,7 +153,7 @@
 	extrn	PRCRLF,CFMCMD,CKCHR,SELMDM,OUTMDM,SETPAR,ESCPR
 	extrn	RSKP,SYSINT,CSRPOS,INPCT,GETCT,OUTBUF,CLOFIL
 	extrn	CLOSEF,SNDXON,SNDXOFF,IN1CHR,INPMDM,SYSCON,SYSFLT
-	extrn	SYSINH,OUTLPT,EXTERN,ADDHLA,CLOSE2
+	extrn	SYSINH,OUTLPT,EXTERN,ADDHLA,CLOSE2,PRTERR
 
 	extrn	STBUFF,STRCNT,REPCNT,STARC,REXBFL,REXCNT,EOFLAG
 	extrn	PRNFLG,ESCCHR,LOGFLG,SYSCLS,STAT01
@@ -164,7 +166,7 @@
 
 	cseg
 
-TTVER:	defb	'KTT  (13) 27-Dec-2020',0
+TTVER:	defb	'KTT  (14) 21-Mar-2021',0
 
 ; This is the TRANSMIT command.  It attempts to send a file, even though
 ; there is no KERMIT on the other side.
@@ -193,7 +195,7 @@ XMIT0:	call	CFMCMD
 	cp	0FFh		; succeed?
 	jp	nz,XMIT1
 	ld	de,ERMS15
-	call	PRTSTR		; display error msg
+	call	PRTERR		; display error msg
 	jp	KERMIT
 
 ; New TRANSMIT routine - transmit a file, line by line, to a remote host

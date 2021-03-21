@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 15, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
+;
 ; edit 14, 31-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Output a newline before displaying the output to prevent overwriting
 ;       the prompt.
@@ -104,7 +106,7 @@
 
 	.Z80
 
-	ident	/14/
+	ident	/15/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -113,8 +115,8 @@
 
 	extrn	SELMDM,FLSMDM,SELCON,KEYCMD,FINISH,LOGOUT,KERMT3
 	extrn	PROMPT,COMND,CFMCMD,CHKKEY,SINIT,KERMIT,OUTCON
-	extrn	COUNTP,READ2,CMGTCH,SPACK,RPACK,NAK0,ACKP,PRTSTR
-	extrn	PRCRLF,ERROR0,RINI2A
+	extrn	COUNTP,READ2,CMGTCH,SPACK,RPACK,NAK0,ACKP,PRCRLF
+	extrn	PRTERR,ERROR0,RINI2A
 
 	extrn	REMDAT,RPRMPT,RDL,RCL,RCOM,RPTR,CMBFLG,NUMTRY
 	extrn	CZSEEN,PKTNUM,NUMPKT,NUMRTR,CURCHK,STATE,TEMP1
@@ -123,7 +125,7 @@
 
 	cseg
 
-REMVER:	defb	'KREM (14) 31-Dec-2020',0	; name, edit number, date
+REMVER:	defb	'KREM (15) 21-Mar-2021',0	; name, edit number, date
 
 ;  REMOTE command - quite similar to the SET command
 
@@ -650,7 +652,7 @@ REMCO2:	ld	a,(NUMTRY)	; get number of retries
 	cp	MAXTRY		; too many retries?
 	jp	m,REMC2A	; no
 	ld	de,ERMS28	; yes, complain
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; and abort
 
 REMC2A:	ld	(NUMTRY),a
@@ -725,7 +727,7 @@ REMCO6:	ld	a,(STATE)	; get packet type again
 	jp	READ2		; do the same as read a file, but echo
 				; to the screen.. Don't close non-open files.
 
-ERMS28:	db	CR,LF,'?Too many retries',0
+ERMS28:	db	'?Too many retries',0
 
 ; REMCLI - Get command-line for Remote commands
 

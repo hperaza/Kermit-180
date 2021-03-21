@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 15, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
+;
 ; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Fixed handling of control chars in command line, so they no longer
 ;       screw up the display. Filename parsing now uses the PFN SYSLIB routine.
@@ -123,7 +125,7 @@
 
 	.Z80
 
-	ident	/14/
+	ident	/15/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -132,7 +134,8 @@
 	public	CMDVER,PROMPT,COMND,CMGTCH,CMBFLG,CMQFLG,CMAFLG
 
 	extrn	KERMIT,PRCRLF,PRTSTR,OUTCON,FLSCON,CLRTOP,CLRLIN
-	extrn	DELCHR,MFINIT,MFNAME,MFEND,P20LN,GETCT,R,RSKP
+	extrn	DELCHR,MFINIT,MFNAME,MFEND,P20LN,GETCT,PRTERR
+	extrn	R,RSKP
 
 	extrn	CMDBUF,CMDPTR,NUMBER,CMHLP,TEMP1,TAKFLG,SFCB,FCB
 
@@ -325,10 +328,10 @@ CMTX5C:	inc	b		; increment the count
 	ret			; and return
 
 CMTXT6:	ld	de,CMER05	; complain - not a valid \ parameter
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; and try another command
 
-CMER05:	db	CR,LF,'?Invalid \ parameter',0
+CMER05:	db	'?Invalid \ parameter',0
 
 ; This routine gets a number from user input.
 ; Called by: COMND
@@ -392,13 +395,13 @@ CMNUM1:	and	7Fh		; here for a (potentially) valid number
 	jp	CMNUM0
 
 GNUM3:	ld	de,CMER04	; invalid number...
-	call	PRTSTR
+	call	PRTERR
 	jp	RSKP
 
 CMIN01:	db	' Enter a number',0
 CMIN02:	db	' Confirm with carriage return or enter more',0
 
-CMER04:	db	CR,LF,'?Invalid number',0
+CMER04:	db	'?Invalid number',0
 
 ; This routine gets a confirm.
 ; Called by: COMND
@@ -580,7 +583,7 @@ CMKY35:	push	hl
 	call	CMAMBG		; test for ambiguity
 	jp	CMKY36		; not ambiguous
 	ld	de,CMER01
-	call	PRTSTR		; say it is ambiguous
+	call	PRTERR		; say it is ambiguous
 	jp	PRSERR		; give up
 
 CMKY36:	pop	de
@@ -635,7 +638,7 @@ CMKY51:	add	hl,de		; increment past the keyword
 
 	jp	CMKEY2		; go check the next keyword
 
-CMER01:	db	CR,LF,'?Ambiguous',0
+CMER01:	db	'?Ambiguous',0
 
 ; Test keyword for ambiguity.
 ; Returns: nonskip if OK, skip if ambiguous.
@@ -876,11 +879,10 @@ CMIFI9:	ld	a,(CMSTAT)
 	cp	CMIFIN		; "silent"?
 	jp	z,R		; yes, let him go w/o check
 	ld	de,CMER02
-CMIF10:	call	PRTSTR
-	ret	
+	jp	PRTERR
 
 CMIF11:	ld	de,CMER03	; complain about wildcards
-	jp	CMIF10
+	jp	PRTERR
 
 	; append '*' to name or extension
 
@@ -893,8 +895,8 @@ CMIF20:	ld	a,(hl)
 CMIF21:	ld	(hl),'*'
 	ret
 
-CMER02:	db	CR,LF,'?Illegal file specification',0
-CMER03:	db	CR,LF,'?Wildcards not allowed in file specification',0
+CMER02:	db	'?Illegal file specification',0
+CMER03:	db	'?Wildcards not allowed in file specification',0
 
 ; Append character in A to command buffer
 ; Called by: CMIFIL

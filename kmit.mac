@@ -267,6 +267,7 @@
 	extrn	XMIT,TYPE,SHOVER,CFMCMD,SYSINT,LOGO,SYSBYE,SYSEXIT
 	extrn	COMND,RD1CHL,CKCHR,SELMDM,OPENTK,CLSETK,PRCRLF,P20LN
 	extrn	DELAY,SETCWD,INPCON,SKPNAM,ADDHLA,NOTIMP,SERVER,INIT
+	extrn	PRTERR
 
 	extrn	BANNER,VTFLG,TAKFLG,BUFSEC,PRNFL,LOGNAM,LOGFCB,GTRXFL
 	extrn	CMBFLG,CMQFLG,CBUFF,CBPTR,NEXITF,INITAK,REMTXT,CURDEV
@@ -279,7 +280,7 @@
 
 	cseg
 
-MITVER:	defb	'KMIT (31) 12-Jan-2021',0	; name, edit number, date
+MITVER:	defb	'KMIT (32) 21-Mar-2021',0	; name, edit number, date
 
 ; Initialization
 
@@ -375,10 +376,10 @@ INMS26:	db	CR,LF,'For help, type ? at any point in a command',0
 ; Here from: LOG, SETCOM, READ, CFMCMD
 
 KERMT3:	ld	de,ERMES3	; "Not confirmed"
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; do it again
 
-ERMES3:	db	CR,LF,'?Not confirmed',0
+ERMES3:	db	'?Not confirmed',0
 
 ; Structure of command table:
 ;
@@ -624,10 +625,10 @@ INP4:	ld	e,a		; save it for a while
 INP5:	; else if error...
 
 	ld	de,ERMS30	; say message not received in time
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; have string, so exit
 
-ERMS30:	db	CR,LF,'?Failed to receive input string in alloted time',0
+ERMS30:	db	'?Failed to receive input string in alloted time',0
 
 ; This is the HELP command.  It gives a list of the commands.
 
@@ -660,10 +661,10 @@ PAUSE:	ld	a,CMNUM		; get the number of the wait period
 	call	DELAY		; sleep until timeout expires or a key is pressed
 	jp	KERMIT		; otherwise we are done.
 PSERR:	ld	de,ERMS24
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT
 
-ERMS24:	db	CR,LF,'?Invalid Pause parameter',0
+ERMS24:	db	'?Invalid Pause parameter',0
 
 ; PRINT - Print a file to the console and printer.
 ;	This command is active only from the command level, and not 
@@ -723,7 +724,7 @@ NTAKE:	ld	a,(INITAK)	; is this the initial TAKE (KERMIT.INI)?
 	or	a
 	ret	nz		; yes, don't complain
 	ld	de,ERMS15	; say file not found
-	jp	PRTSTR		; output message and return
+	jp	PRTERR		; output message and return
 
 	dseg
 

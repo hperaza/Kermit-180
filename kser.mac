@@ -41,8 +41,8 @@
 
 	public	SRVVER,SERVER
 
-	extrn	KERMIT,CLRTOP,RPACK,SPACK,NAK,NAK0,ACKP,SEND1,READ1
-	extrn	SNDERR,SPAR,CSRPOS
+	extrn	KERMIT,RPACK,SPACK,NAK,NAK0,ACKP,SEND1,READ1,SPAR
+	extrn	SNDERR,CSRPOS,SCREND
 
 	extrn	SRVFLG,ARGBLK,DATA,NUMPKT,PKTNUM,NUMRTR,NUMTRY,CURCHK
 	extrn	SFCB,QUIETD
@@ -98,18 +98,18 @@ SERV3:	cp	'K'		; Kermit command?
 
 	;...TODO
 
-	jp	SERV6
+	jp	SERV7
 
 SERV4:	cp	'C'		; Host command?
 	jr	nz,SERV5	; no
-	jp	SERV6		; and we'll not support them for security reasons
+	jp	SERV7		; and we'll not support them for security reasons
 
 SERV5:	cp	'G'		; Generic command?
-	jr	nz,SERV6	; no, error
+	jr	nz,SERV6	; no
 	ld	a,(ARGBLK+1)	; get length
 	ld	c,a		; keep a copy in register C
 	or	a		; any command?
-	jr	z,SERV6		; no, error
+	jr	z,SERV7		; no, error
 	ld	hl,DATA
 	ld	a,(hl)		; get command char
 	dec	c		; decrement length
@@ -119,7 +119,9 @@ SERV5:	cp	'G'		; Generic command?
 	;...TODO: restore orig. directory?
 
 	call	ACKP		; ACK the command
-	call	CLRTOP		; clear screen
+	ld	a,(QUIETD)
+	or	a		; quiet display?
+	call	z,SCREND	; no, position cursor
 	xor	a
 	ld	(SRVFLG),a	; exit server mode
 	jp	KERMIT		; back to command mode
@@ -165,14 +167,17 @@ SERV58:	cp	'M'		; Short Message?
 	;...TODO
 
 SERV59:	cp	'L'		; Logout/Bye?
-	jp	nz,SERV6	; no, and that's about it
+	jp	nz,SERV7	; no, and that's about it
 
 	;...TODO
 
-SERV6:	ld	de,ERMS1
+SERV6:	cp	'N'		; NAK?
+	jp	z,SERVER	; yes, ignore
+
+SERV7:	ld	de,ERMS1
 	call	SNDERR		; send Error packet
 	jp	SERVER		; restart server
 
-ERMS1:	defb	'?Invalid command',CR,LF,0
+ERMS1:	defb	'?Invalid command',0
 
 	end

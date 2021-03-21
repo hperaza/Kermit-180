@@ -247,7 +247,7 @@
 	extrn	GETFIL,SCRST,RPPOS,SPPOS,SETPAR,CLRTOP,SCREND
 	extrn	MAKFIL,CFMCMD,SCRNRT,SCRERR,CLSETK,SYSSCR,FCBSTR
 	extrn	OPENRW,CLOSEF,CLOSE2,SETFCB,FCBS2,STRLEN,DELET2
-	extrn	MFEND,CLREOL,FLSCON,R,RSKP
+	extrn	MFEND,CLREOL,FLSCON,PRTERR,R,RSKP
 
 	extrn	GTRXFL,REMDAT,RDL,QUIETD,STATE,CZSEEN,NUMPKT
 	extrn	NUMRTR,PKTNUM,NUMTRY,REMTXT,AUTORC,DATA,ARGBLK
@@ -301,6 +301,8 @@ READ1:	xor	a		; we received a Server Send command
 	inc	a
 	ld	(RDL),a
 	call	RINI2A		; ACK the Send-Init packet with params
+	ld	de,INMS24	; get "Receiving..." message
+	call	FINMES		; print it
 	jr	READ11
 
 ; Enter here for RECEIVE command
@@ -507,7 +509,7 @@ RINIT3:	cp	'E'		; is it an Error packet?
 	call	ERROR		; if yes, display the error info
 	jp	ABORT		; and Abort
 
-ERMES4:	defb	'?Unable to receive initiate',CR,LF,0
+ERMES4:	defb	'?Unable to receive initiate',0
 
 ; Receive File
 ; Called by: READ
@@ -656,8 +658,8 @@ RFILE5:	cp	'E'		; is it an Error packet?
 	call	ERROR		; yes, display error info
 	jp	ABORT		; and Abort
 
-ERMES5:	defb	'?Unable to receive file name',CR,LF,0
-ERMES6:	defb	'?Unable to receive end of file',CR,LF,0
+ERMES5:	defb	'?Unable to receive file name',0
+ERMES6:	defb	'?Unable to receive end of file',0
 
 ; Receive data
 ; Called by: READ
@@ -796,11 +798,10 @@ RDATA4:	cp	'E'		; is it an Error packet?
 	call	ERROR		; yes, display error info
 	jp	RDAT16		; close file and Abort
 
-ERMS10:	defb	'?Unable to receive data',CR,LF,0
+ERMS10:	defb	'?Unable to receive data',0
 
 ; SEND command
 ; Here from: KERMIT
-; SEND1: alternate entry point from SERVER code.
 
 SEND:	ld	a,CMIFI		; parse an input file spec
 	ld	de,SFCB		; give the address for the FCB
@@ -816,6 +817,8 @@ SEND:	ld	a,CMIFI		; parse an input file spec
 	ld	(REMLEN),a	; save length (may be zero)
 	jr	SEND11		; continue below
 
+; Enter here from SERVER routine.
+
 SEND1:	xor	a		; here from SERVER routine
 	ld	(REMLEN),a	;  so clear length (no local file name)
 	ld	(REMTXT),a
@@ -823,8 +826,28 @@ SEND11:	call	MFINIT		; initialize file search
 	call	MFNAME		; handle (multi) files
 	jr	nc,SEND14	; got a valid file-name
 	ld	de,ERMS15
-	call	PRTSTR		; display error msg. (where it's visible)
+	push	de
+	call	SEND12		; display error msg. (where it's visible)
+	pop	de
+	ld	a,(SRVFLG)
+	or	a		; are we in Server mode?
+	call	nz,SNDERR	; yes, send error to remote client
 	jp	KERMIT
+
+SEND12:	ld	a,(SRVFLG)
+	or	a		; Server mode?
+	jp	z,PRTERR	; no, output error message after newline
+	push	de
+	ld	a,(QUIETD)
+	or	a		; quiet display?
+	call	z,SCRERR	; no, position cursor
+	pop	de
+	call	PRTSTR		; output message
+	ld	a,(QUIETD)
+	or	a		; quiet display?
+	ret	nz		; yes, return
+	call	CLREOL		; else erase to end of line
+	jp	PRCRLF		; and output a newline
 
 SEND14:	call	INIT		; clear the line and initialize the buffers
 	xor	a
@@ -990,7 +1013,7 @@ SINIT4:	cp	'E'		; is it an Error packet?
 	call	ERROR		; else display the error info
 	jp	ABORT		;  and abort
 
-ERMS14:	defb	'?Unable to receive an acknowledgement from the host',CR,LF,0
+ERMS14:	defb	'?Unable to receive an acknowledgement from the host',0
 
 ; Send file header
 ; Called by: SEND
@@ -1814,8 +1837,10 @@ PTCHR9:	ld	de,ERMS11	; "?Disk full"
 SNDERR:	ld	hl,DATA		; where to put the message for "E" packet
 	ld	c,0		; zero length of packet data
 PTCH9A:	ld	a,(de)		; get a character to copy
-	cp	CR		; no more to copy?
+	or	a		; no more to copy?
 	jr	z,PTCH9B	; yes, we can send the packet
+	cp	CR		; CR also ends message?
+	jr	z,PTCH9B
 	ld	(hl),a		; no, copy the character
 	inc	de		; and increment source/dest pointers
 	inc	hl
@@ -1831,7 +1856,7 @@ PTCH9B:	ld	(hl),0		; put in a zero
 	nop			;   bombing off anyway
 	ret			; take error return
 
-ERMS11:	defb	'?Disk full',CR,LF,0
+ERMS11:	defb	'?Disk full',0
 
 ; Fill a data packet from file
 ; Called by: SFILE, SDATA
@@ -2085,7 +2110,7 @@ FINSH1:	ld	a,(NUMTRY)	; how many times have we tried?
 	cp	MAXTRY		; too many times?
 	jp	m,FINSH3	; no, try it
 FINSH2:	ld	de,ERMS18	; say we couldn't do it
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; go home
 
 FINSH3:	inc	a		; increment the number of tries
@@ -2108,7 +2133,7 @@ FINSH3:	inc	a		; increment the number of tries
 	call	ERROR1		; print the error message
 	jp	KERMIT		; and exit
 
-ERMS18:	defb	CR,LF,'?Unable to tell host that the session is finished',0
+ERMS18:	defb	'?Unable to tell host that the session is finished',0
 
 ; This is the LOGOUT command.  It tells the remote KERSRV to logout.
 ; Here from: KERMIT
@@ -2133,7 +2158,7 @@ LOGO1:	ld	a,(NUMTRY)	; how many times have we tried?
 	cp	MAXTRY		; too many times?
 	jp	m,LOGO3		; no, try it
 LOGO2:	ld	de,ERMS19	; say we couldn't do it
-	call	PRTSTR
+	call	PRTERR
 	ret			; finished
 
 LOGO3:	inc	a		; increment the number of tries
@@ -2155,7 +2180,7 @@ LOGO3:	inc	a		; increment the number of tries
 	jp	nz,LOGO1	; try sending the packet again
 	jp	ERROR1		; print the error message and return
 
-ERMS19:	defb	CR,LF,'?Unable to tell host to logout',0
+ERMS19:	defb	'?Unable to tell host to logout',0
 
 ; Packet routines
 
@@ -2854,6 +2879,9 @@ ERROR2:	ld	a,(ARGBLK+1)	; get the length of the data
 	and	a
 	ret	nz		; so don't say a thing
 ERRR2A:	call	PRTSTR
+	ld	a,(QUIETD)	; a quiet display?
+	and	a
+	call	z,PRCRLF	; no, print newline
 	ret	
 
 ERROR3:	ld	a,(QUIETD)	; a quiet display?
@@ -2866,6 +2894,9 @@ ERROR3:	ld	a,(QUIETD)	; a quiet display?
 	call	SCRERR		; position the cursor
 	pop	de		; get the pointer back
 ERR3A:	call	PRTSTR		; print error message
+	ld	a,(QUIETD)	; a quiet display?
+	and	a
+	call	z,PRCRLF	; no, print newline
 	ret	
 
 ; Set up for file transfer.

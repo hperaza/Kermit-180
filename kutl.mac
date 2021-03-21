@@ -19,6 +19,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 33, 21-Mar-2021 by H. Peraza: added PRTERR routine to output error
+;       messages preceded by a newline.
+;
 ; edit 32, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Low-level file I/O routines are now in the KSYS.MAC module. Rewritten
 ;       the INBUF and OUTBUF routines, CHRCNT is now 16-bit wide and holds
@@ -215,7 +218,7 @@
 
 	.Z80
 
-	ident	/32/
+	ident	/33/
 
 	include	KDEF.INC
 	include	FCB.INC
@@ -225,7 +228,7 @@
 	public	PAUSIT,INPCT,P20LN,DEVSTR,DIRSTR,CLOFIL,INBUF
 	public	OUTBUF,OUTPRN,GETFIL,MAKFIL,APPFIL,SKPNAM,FCBS2
 	public	SNDXON,SNDXOFF,IN1CHR,ADDHLA,FCBSTR,STRLEN,GETCT
-	public	STRCPY,CPYNAM,R,RSKP
+	public	PRTERR,STRCPY,CPYNAM,R,RSKP
 
 	extrn	PRTSTR,OUTCON,COMND,KERMIT,KERMT3,OUTLPT,LPTSTAT
 	extrn	OUTMDM,OPENR,OPENRW,CREATF,READF,READF2,WRITEF
@@ -240,7 +243,7 @@
 
 	cseg
 
-UTLVER:	defb	'KUTL (32) 27-Dec-2020',0
+UTLVER:	defb	'KUTL (33) 21-Mar-2021',0
 
 ; Set the parity for a character in A.
 ; Called by: SPACK, REXMIT, LOGIT, VT52, CONCHR, INTCHR
@@ -306,10 +309,10 @@ KEYCMD:	ld	a,CMKEY
 	jp	KEYCM2		; no match
 	ret	
 KEYCM2:	ld	de,ERMES1	; "Unrecognized Command"
-	call	PRTSTR
+	call	PRTERR
 	jp	KERMIT		; do it again.
 
-ERMES1:	db	CR,LF,'?Unrecognized command',0
+ERMES1:	db	'?Unrecognized command',0
 
 ; Request confirmation; if unsuccessful, return to command level.
 ; Called by: BYE, EXIT, HELP, LOG, SETCOM, SHOW, STATUS, SEND,
@@ -1069,6 +1072,14 @@ ISBLNK:	cp	' '		; blanks are spaces
 	ret	z
 	cp	TAB		; and tabs
 	ret
+
+; Output error message preceded by a newline. Called with message address
+; in DE.
+
+PRTERR:	push	de		; save pointer
+	call	PRCRLF		; output newline
+	pop	de		; restore pointer
+	jp	PRTSTR		; output message
 
 	dseg
 

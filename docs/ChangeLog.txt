@@ -181,3 +181,24 @@ Using Kermit-80 4.11 as the base version.
 - Restore terminal mode (disable binary mode) on exit.
 
 
+19/03/21
+
+- Started implementing Server mode in Kermit-180.
+
+
+20/03/21
+
+- Server 'finish' command now exits Server mode.
+
+- The basic server 'send' and 'receive' operations are now working, but
+  things like error reporting still need to be implemented and/or tested.
+
+
+21/03/21
+
+- Server mode, get command: send correct error message to remote machine
+  if file was not found.
+
+- New get/send/server screen layout.
+
+
