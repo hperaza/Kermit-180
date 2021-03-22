@@ -820,6 +820,8 @@ OUTMD:	ld	hl,(OPTR)	; load output buffer pointer
 ; Destroys HL.
 
 FLSMDM:	ld	a,(OCNT)	; get number of characters in buffer
+	or	a
+	ret	z
 	ld	l,a
 	ld	h,0		; make it a 16-bit word
 	ld	(QIOMWR+Q.LEN),hl ; save for QIO request
