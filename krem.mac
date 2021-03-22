@@ -113,7 +113,7 @@
 
 	public	REMVER,REMOTE
 
-	extrn	SELMDM,FLSMDM,SELCON,KEYCMD,FINISH,LOGOUT,KERMT3
+	extrn	SELMDM,PURMDM,SELCON,KEYCMD,FINISH,LOGOUT,KERMT3
 	extrn	PROMPT,COMND,CFMCMD,CHKKEY,SINIT,KERMIT,OUTCON
 	extrn	COUNTP,READ2,CMGTCH,SPACK,RPACK,NAK0,ACKP,PRCRLF
 	extrn	PRTERR,ERROR0,RINI2A
@@ -130,7 +130,7 @@ REMVER:	defb	'KREM (15) 21-Mar-2021',0	; name, edit number, date
 ;  REMOTE command - quite similar to the SET command
 
 REMOTE:	call	SELMDM		; select modem
-	call	FLSMDM		; flush buffers
+	call	PURMDM		; purge input buffer
 	call	SELCON		; back to keyboard
 	ld	de,REMTAB	; remote commands table
 	ld	hl,REMHLP	; remote help table
@@ -272,7 +272,7 @@ REMCP0:	ld	(REMDAT),a	; into packet
 	ld	(hl),a		; put length in packet
 	ld	a,(RDL)		; get accumulated data length
 	add	a,c		; plus data length
-	add	a,1		; plus field length character
+	inc	a		; plus field length character
 	ld	(RDL),a		; and remember it
 	jp	REMCOM		; and branch to common code
 
@@ -293,11 +293,11 @@ REMCD0:	ld	(REMDAT),a	; into packet
 	ld	(REMDAT+1),a	; and store in packet data area
 	ld	a,(RDL)		; get length so far
 	add	a,b		; count answer length
-	add	a,1		; and field length character
+	inc	a		; and field length character
 	ld	(RDL),a		; and remember current packet-size
 	ld	a,(REMDAT)	; get generic packet flavor
 	cp	'C'		; remote CD?
-	jp	nz,REMCD1	; no
+	jr	nz,REMCD1	; no
 	ld	a,b		; get length of possible directory spec
 	or	a		; did the user give a directory spec?
 	jp	z,REMCOM	; no, we can process the command immediately
@@ -320,7 +320,7 @@ REMCD1:	ld	hl,(RPRMPT)	; point to "password" prompt
 	ld	hl,(RPTR)	; get data pointer
 	ld	(hl),a		; put length in packet
 	ld	a,(RDL)		; get accumulated data length
-	add	a,1		; count encoded field length
+	inc	a		; count encoded field length
 	add	a,c		; plus data length
 	ld	(RDL),a		; and remember packet-size
 	jp	REMCOM		; branch to common code
@@ -340,9 +340,9 @@ REMDL0:	ld	(REMDAT),a
 	ld	b,a		; save length
 	ld	a,(REMDAT)	; get packet type
 	cp	'E'		; if Generic Delete
-	jp	z,REMDL1	;  we must have an argument
+	jr	z,REMDL1	;  we must have an argument
 	cp	'T'		; ditto for Generic Type
-	jp	z,REMDL1
+	jr	z,REMDL1
 	ld	a,b		; else get back character count
 	or	a		; answer typed?
 	jp	z,REMCOM	; no, process packet as is
@@ -353,7 +353,7 @@ REMDL1:	ld	a,b		; get character count again
 	ld	(REMDAT+1),a	; and put in packet
 	ld	a,(RDL)		; get packet length so far
 	add	a,b		; count length of filespec
-	add	a,1		; count field length character
+	inc	a		; count field length character
 	ld	(RDL),a		; and store packet length
 	jp	REMCOM		; and do our stuff
 
@@ -407,7 +407,7 @@ REMLGI:	ld	a,'G'		; Generic command
 	ld	(REMDAT+1),a	; and store in packet data area
 	ld	a,(RDL)		; get packet length
 	add	a,b		; count id length
-	add	a,1		; and field length character
+	inc	a		; and field length character
 	ld	(RDL),a		; and remember accumulated length
 	ex	de,hl		; save data pointer
 	ld	(RPTR),hl
@@ -427,7 +427,7 @@ REMLGI:	ld	a,'G'		; Generic command
 	ld	hl,(RPTR)	; get pointer
 	ld	(hl),a		; put length in packet
 	ld	a,(RDL)		; get accumulated data length
-	add	a,1		; count encoded field length
+	inc	a		; count encoded field length
 	add	a,c		; count "password" field length
 	ld	(RDL),a		; and remember new packet length
 	ex	de,hl		; save data pointer
@@ -447,7 +447,7 @@ REMLGI:	ld	a,'G'		; Generic command
 	ld	hl,(RPTR)	; get data pointer
 	ld	(hl),a		; put length in packet
 	ld	a,(RDL)		; get accumulated data length
-	add	a,1		; count encoded field length
+	inc	a		; count encoded field length
 	add	a,c		; plus "account" length
 	ld	(RDL),a		; and remember it
 	jp	REMCOM		; branch to common code
@@ -510,10 +510,10 @@ REMSCM:	ld	de,REMDAT+6	; we get an argument from the user
 
 REMSC1:	call	CHKKEY		; get user's selection
 	ld	(REMDAT+6),a	;  and put into the packet data area
-	ld	a,'!'		; encoded field length for 1 char
+	ld	a,1+' '		; encoded field length for 1 char
 	ld	(REMDAT+5),a	; put in packet
 	ld	a,(RDL)		; get accumulated packet data length
-	add	a,1		; count length of answer (1 char)
+	inc	a		; count length of answer (1 char)
 	ld	(RDL),a		;  and store as new packet data length
 	jp	REMCOM		; go do common Remote command processing
 
@@ -637,7 +637,7 @@ REMC0X:	ld	a,(TEMP1)	; get loop counter
 	jp	nz,REMC0A	; copy entire packet data area
 
 REMCM1:	xor	a
-	ld	(ARGBLK),a	; set packet no zero
+	ld	(ARGBLK),a	; set packet number to zero
 	ld	a,(RDL)		; number of bytes in packet
 	ld	(ARGBLK+1),a	; into argument block
 	ld	a,(RCOM)	; remote command
@@ -694,9 +694,7 @@ REMC2C:	cp	'N'		; NACKed packet?
 	push	hl		; yes, save pointer
 	push	af		; and character count
 	ld	e,'<'		; type "<<" as in VMSKermit
-	push	de
 	call	OUTCON
-	pop	de
 	call	OUTCON
 	pop	af		; restore character counter
 	pop	hl		; and data pointer
@@ -712,9 +710,7 @@ REMC2D:	or	a
 	pop	af		; restore loop counter
 	jp	REMC2D		; type all packet data
 REMC2E:	ld	e,'>'		; type ">>" as in VMSKermit
-	push	de
 	call	OUTCON
-	pop	de
 	call	OUTCON
 	call	PRCRLF		; end the line
 REMCO6:	ld	a,(STATE)	; get packet type again

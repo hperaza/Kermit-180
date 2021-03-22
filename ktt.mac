@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 15, 22-Mar-2021 by H. Peraza: flush modem output buffer in CONCHR
+;       to ensure proper char-by-char TELNET operation.
+;
 ; edit 14, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
 ;
 ; edit 13, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
@@ -141,7 +144,7 @@
 
 	.Z80
 
-	ident	/14/
+	ident	/15/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -151,14 +154,14 @@
 
 	extrn	COMND,KERMIT,GETFIL,PRTSTR,SELCON,OUTCON,APPFIL
 	extrn	PRCRLF,CFMCMD,CKCHR,SELMDM,OUTMDM,SETPAR,ESCPR
-	extrn	RSKP,SYSINT,CSRPOS,INPCT,GETCT,OUTBUF,CLOFIL
+	extrn	RSKP,SYSINT,CSRPOS,INPCT,GETCT,OUTBUF,CLOFIL,FLSMDM
 	extrn	CLOSEF,SNDXON,SNDXOFF,IN1CHR,INPMDM,SYSCON,SYSFLT
 	extrn	SYSINH,OUTLPT,EXTERN,ADDHLA,CLOSE2,PRTERR
 
 	extrn	STBUFF,STRCNT,REPCNT,STARC,REXBFL,REXCNT,EOFLAG
-	extrn	PRNFLG,ESCCHR,LOGFLG,SYSCLS,STAT01
-	extrn	ECOFLG,BUFPNT,BUFLEN,CHRCNT,TACFLG,TACCHR,VTFLG
-	extrn	REXBUF,PTTAB,LOGFCB,FCB,FCB2
+	extrn	PRNFLG,ESCCHR,LOGFLG,SYSCLS,STAT01,ECOFLG,BUFPNT
+	extrn	BUFLEN,CHRCNT,TACFLG,TACCHR,VTFLG,REXBUF,PTTAB
+	extrn	LOGFCB,FCB,FCB2
 
 	extrn	ERMS15
 
@@ -166,7 +169,7 @@
 
 	cseg
 
-TTVER:	defb	'KTT  (14) 21-Mar-2021',0
+TTVER:	defb	'KTT  (15) 22-Mar-2021',0
 
 ; This is the TRANSMIT command.  It attempts to send a file, even though
 ; there is no KERMIT on the other side.
@@ -750,6 +753,7 @@ CONCHR:	call	INPCT		; try to get a character from the console
 	ld	e,a		; restore it
 	push	de		; need to save E in case we are half dplx
 	call	OUTMDM		; output the char to the port.
+	call	FLSMDM		; make sure it was sent right away
 	pop	de		; just in case we are half dplx
 	call	SELCON		; reselect console
 	ld	a,(ECOFLG)	; get the echo flag

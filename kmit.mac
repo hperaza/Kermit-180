@@ -680,7 +680,8 @@ TYPENT:	ld	(PRNFL),a	; type file entry, common for PRINT and TYPE
 
 ; SERV - Enter SERVER mode
 
-SERV:	ld	a,0FFh
+SERV:	call	CFMCMD		; confirm...
+	ld	a,0FFh
 	ld	(SRVFLG),a	; set SERVER mode flag
 	call	INIT		; set up screen
 	jp	KERMIT		; enter Server via main loop

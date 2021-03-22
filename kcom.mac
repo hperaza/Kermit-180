@@ -1405,7 +1405,7 @@ FLOST:	db	CR,LF,'Flow control',0
 ;	ld	a,(CASENS)
 ;	jp	STATON		; say if its on or off
 ;
-;SENST:	db	CR,LF,'Case sensetivity',0
+;SENST:	db	CR,LF,'Case sensitivity',0
 
 ; Show debug mode
 

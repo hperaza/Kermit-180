@@ -228,7 +228,7 @@
 	public	PAUSIT,INPCT,P20LN,DEVSTR,DIRSTR,CLOFIL,INBUF
 	public	OUTBUF,OUTPRN,GETFIL,MAKFIL,APPFIL,SKPNAM,FCBS2
 	public	SNDXON,SNDXOFF,IN1CHR,ADDHLA,FCBSTR,STRLEN,GETCT
-	public	PRTERR,STRCPY,CPYNAM,R,RSKP
+	public	MAKFI1,PRTERR,STRCPY,CPYNAM,R,RSKP
 
 	extrn	PRTSTR,OUTCON,COMND,KERMIT,KERMT3,OUTLPT,LPTSTAT
 	extrn	OUTMDM,OPENR,OPENRW,CREATF,READF,READF2,WRITEF
@@ -535,7 +535,7 @@ DEC32:	ld	a,l
 
 MAKFIL:	ld	hl,0
 	ld	(FCB2+F.VER),hl	; ensure version number is zero
-	call	CREATF		; create new version of file
+MAKFI1:	call	CREATF		; create file
 	ret	c		; error return
 
 ; Success, set up pointers and counters for multisector buffering.

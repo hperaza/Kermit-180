@@ -21,6 +21,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 31, 21-Mar-2021 by H. Peraza: display received file name only after
+;       version number is known. Fixed SET COLLISION OVERWRITE.
+;
 ; edit 30, 20-Mar-2021 by H. Peraza: reset Server Mode flag in INCHR if
 ;       the user entered Control-C at the console. Added SEND1 and READ1
 ;       entry points for Server mode get and send commands. Close directory
@@ -231,7 +234,7 @@
 
 	.Z80
 
-	ident	/30/
+	ident	/31/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -239,15 +242,15 @@
 
 	public	PKTVER,READ,READ0,READ2,SEND,LOGO,LOGOUT,FINISH
 	public	NAK,NAK0,ACKP,COUNTP,ERROR,ERROR0,RPACK,SPACK
-	public	INIT,SINIT,SEND1,READ1,RINI2A,SPAR,SNDERR
+	public	INIT,SINIT,SEND1,READ1,RINI2A,SPAR,SNDERR,FINMES
 
 	extrn	KERMIT,KERMT3,COMND,PRTSTR,PRCRLF,SCRFLN,NOUT
 	extrn	SCRNP,SELCON,INPCON,OUTCON,SELMDM,INPMDM,OUTMDM
-	extrn	FLSMDM,CLOFIL,MFINIT,MFNAME,INBUF,OUTBUF,OUTPRN
+	extrn	PURMDM,CLOFIL,MFINIT,MFNAME,INBUF,OUTBUF,OUTPRN
 	extrn	GETFIL,SCRST,RPPOS,SPPOS,SETPAR,CLRTOP,SCREND
 	extrn	MAKFIL,CFMCMD,SCRNRT,SCRERR,CLSETK,SYSSCR,FCBSTR
 	extrn	OPENRW,CLOSEF,CLOSE2,SETFCB,FCBS2,STRLEN,DELET2
-	extrn	MFEND,CLREOL,FLSCON,PRTERR,R,RSKP
+	extrn	MAKFI1,MFEND,CLREOL,FLSCON,PRTERR,R,RSKP
 
 	extrn	GTRXFL,REMDAT,RDL,QUIETD,STATE,CZSEEN,NUMPKT
 	extrn	NUMRTR,PKTNUM,NUMTRY,REMTXT,AUTORC,DATA,ARGBLK
@@ -265,7 +268,7 @@
 
 	cseg
 
-PKTVER:	defb	'KPKT (30) 20-Mar-2021',0	; name, edit number, date
+PKTVER:	defb	'KPKT (31) 21-Mar-2021',0	; name, edit number, date
 
 ; GET command
 ; Here from: KERMIT
@@ -287,8 +290,7 @@ READ:	ld	a,0FFh		; we are doing a Get
 	jr	z,READ01	; no, go ahead and position cursor
 	call	PRCRLF		; yes, keep from overwriting the prompt
 	jr	READ00		;  and write filename
-READ01:	call	SCRFLN		; position cursor
-	call	CLREOL		; erase to end of line
+READ01:	call	SCRFLN		; position cursor and erase to end of line
 READ00:	ld	de,REMDAT	; print the file name, in either case
 	call	PRTSTR
 	jp	READ0A		; go get local name if any
@@ -339,7 +341,7 @@ READ11:	ld	a,(QUIETD)	; quiet display?
 	ld	hl,0
 	call	NOUT		; write the number of retries
 	call	CLREOL		; erase to end of line
-	call	FLSCON
+	call	FLSCON		; ensure immediate output
 READ13:	ld	a,(RDL)		; Get or Receive?
 	or	a
 	jr	nz,READ2	; Get, don't reset state
@@ -359,7 +361,7 @@ READ2:	ld	a,(QUIETD)	; noisy display?
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the current packet number
 	call	CLREOL		; erase to end of line
-	call	FLSCON
+	call	FLSCON		; ensure immediate output
 READ21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Receive state?
 	jr	nz,READ22
@@ -583,6 +585,15 @@ RFILE3:	cp	'F'		; start of file?
 	jr	nz,RFIL3A	; yes, don't open a file
 	call	GOFIL		; get a file to write to, and init output buffer
 	jp	ABORT		; on error, Abort
+	ld	a,(QUIETD)	; quiet display?
+	and	a
+	call	z,SCRFLN	; no, position cursor and erase to end of line
+	ld	ix,FCB2		; point to FCB
+	ld	hl,FNBUF	; get address of string buffer
+	push	hl		; save string address
+	call	FCBS2		; convert FCB to string
+	pop	de		; restore string address
+	call	PRTSTR		; print the file name
 RFIL3A:	ld	a,(NUMTRY)	; get the number of tries
 	ld	(OLDTRY),a	; save it
 	call	ACKP
@@ -607,9 +618,7 @@ RFIL3D:	call	COMPP		; expected packet?
 	jp	z,RFIL3E	; no
 	push	af		; yes, save character count
 	ld	e,'<'		; write "<<" as in VMSKermit
-	push	de
 	call	OUTCON
-	pop	de
 	call	OUTCON
 	pop	af		; restore character count
 	ld	hl,DATA		; lets write the filename (?) to display
@@ -623,9 +632,7 @@ RFIL3F:	push	af		; save loop counter
 	dec	a		; decrement the counter
 	jr	nz,RFIL3F	; display entire filename
 	ld	e,'>'		; put in ">>" as in VMSKermit
-	push	de
 	call	OUTCON
-	pop	de
 	call	OUTCON
 	call	PRCRLF		; new line
 RFIL3E:	ld	a,(NUMTRY)	; get the number of tries
@@ -864,7 +871,7 @@ SEND14:	call	INIT		; clear the line and initialize the buffers
 	ld	hl,0
 	call	NOUT		; write the number of retries
 	call	CLREOL		; erase to end of line
-	call	FLSCON
+	call	FLSCON		; ensure immediate output
 SEND15:	ld	a,'1'		; reset to use single character checksum
 	ld	(CURCHK),a	; for startup
 	ld	a,'S'
@@ -880,7 +887,7 @@ SEND2:	ld	a,(QUIETD)	; a quiet display?
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the packet number
 	call	CLREOL		; erase to end of line
-	call	FLSCON
+	call	FLSCON		; ensure immediate output
 SEND21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Send state?
 	jr	nz,SEND3
@@ -1062,10 +1069,8 @@ SFILE4:	; copy remote name into packet to send
 SFIL13:	ld	(ARGBLK+1),a	; store number of chars in file name
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jr	nz,SFI13A	; yes, don't write
-	call	SCRFLN		; position cursor
-	call	CLREOL		; erase to end of line
-SFI13A:	ld	de,DATA		; print the file name though, in either case
+	call	z,SCRFLN	; no, position cursor and erase to end of line
+	ld	de,DATA		; print the file name though, in either case
 	call	PRTSTR
 	ld	a,(PKTNUM)	; get the packet number
 	ld	(ARGBLK),a
@@ -2017,7 +2022,7 @@ GTCHR9:	; not enough room left in buffer...
 GTCEOF:	ld	a,-1		; get a minus one
 	ret	
 
-; Get the file name (including host to micro translation)
+; Get the file name (including host to micro translation) and create the file.
 ; Called by: RFILE
 
 GOFIL:	ld	hl,DATA		; get the address of the file name
@@ -2027,79 +2032,59 @@ GOFIL:	ld	hl,DATA		; get the address of the file name
 	ld	hl,REMNAM	; yes, use this instead
 GOFIL0:	ld	ix,FCB2		; put result in FCB2 (will open for write)
 	call	PFN		; parse file name
-	ld	(hl),0		; put in a trailing null for printing
-	ld	a,(QUIETD)	; quiet display?
-	and	a
-	jr	nz,GOFI70	; yes, so skip it
-	call	SCRFLN		; position cursor
-	call	CLREOL		; erase to end of line
-GOFI70:	ld	de,DATA		; print the file name
-	ld	a,(GTRXFL)	; are we doing a Get or Receive?
-	and	a
-	jr	z,GOFI7A	; if zero, Receive
-	ld	de,REMNAM
-GOFI7A:	call	PRTSTR
-GOFI7B:	xor	a		; zero "discard" flag
+	xor	a		; zero "discard" flag
 	ld	(DSCFLG),a
-	ld	a,(FLWFLG)	; is file warning on?
-	or	a
-	jp	z,GOFIL9	; if not, just proceed (overwrite existing file)
-
 	ld	ix,FCB2
 	ld	a,(ix+F.ATTR)
 	and	FN.VER		; version explicit?
 	jp	z,GOFIL9	; no, create new version
+	ld	a,(FLWFLG)	; is file warning on?
+	or	a
+	jp	z,GOFIL4	; if not, just proceed (overwrite existing file)
 
-;***TODO: check all SET COLLISION options
 	call	SETFCB		; setup FCB2 with default dev/dir if necessary
 	call	OPENRW		; see if file exists
 	jr	c,GOFIL9	; no, create it
 	call	CLOSE2		; close file
 
+	; file exists
+
 	ld	a,(FLWFLG)	; get flag again
 	cp	2		; SET COLLISION DISCARD?
-	jp	nz,GOFI7H	; no
+	jp	nz,GOFIL2	; no
 	ld	a,0FFh		; yes, order rejection of the file
 	ld	(DSCFLG),a
 	jp	RSKP		; and pretend successful open
 
-GOFI7H:	; here with SET COLLISION NEW-VERSION
+GOFIL2:	or	a		; SET COLLISION OVERWRITE?
+	jr	nz,GOFIL3
+GOFIL4:	call	DELET2		; delete old file (TODO: better open file and IO.TRN it to avoid possible race condition)
+	call	MAKFI1		; re-create the file
+	jp	GOFL91		; disk was full or access denied
+	jp	RSKP		; success
+
+GOFIL3:	; here with SET COLLISION NEW-VERSION
 
 	ld	de,INFMS5	; inform the user
 	call	ERROR3
-
 	ld	a,(ix+F.ATTR)
 	and	NOT FN.VER
 	ld	(ix+F.ATTR),a	; force new version
-
-;***TODO: can print the new name only after the file is created,
-;         until then, the new version number is unknown.
-
-	ld	ix,FCB2		; point to source file name
-	ld	hl,FNBUF	; make the file name into a character string
-	push	hl		; save string address
-	call	FCBSTR		; convert FCB2 to string
-	pop	de		; restore string address
-	call	PRTSTR		; write string to console
-
-; Now lets make the file (create it)
-
-GOFIL9:
-;***TODO: delete file first (at least until IO.TRN works)
-	call	MAKFIL		; create the file
+GOFIL9:	call	MAKFIL		; create the file
 	jp	GOFL91		; disk was full or access denied
 	jp	RSKP		; success
+
 GOFL91:	ld	de,ERMS11
 	jp	ERROR3
 
-INFMS5:	defb	'%Renaming file to ',0
+INFMS5:	defb	'%New version created',0
 
 ; This is the FINISH command.  It tells the remote KERSRV to exit.
 ; Here from KERMIT
 
 FINISH:	call	CFMCMD
 	call	SELMDM		; select modem
-	call	FLSMDM		; flush modem buffers
+	call	PURMDM		; purge modem input buffer
 	call	SELCON		; select terminal again
 	xor	a
 	ld	(NUMTRY),a	; inititialize count
@@ -2147,7 +2132,7 @@ LOGOUT:	call	CFMCMD
 ; Called by: BYE, LOGOUT
 
 LOGO:	call	SELMDM		; select modem
-	call	FLSMDM		; flush buffers
+	call	PURMDM		; purge modem input buffer
 	call	SELCON		; select terminal again
 	xor	a
 	ld	(NUMTRY),a	; inititialize count
@@ -2738,7 +2723,7 @@ INCHR6:	ld	a,(TIMFLG)	; pick up timer flag
 	jr	nz,INCHR0	;
 	call	UPDRTR		; count as retry (?)
   IF 1
-	call	FLSMDM		; purge input buffer
+	call	PURMDM		; purge modem input buffer
   ENDIF
 	pop	bc		; restore registers
 	pop	hl
@@ -2906,7 +2891,7 @@ INIT:	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	call	z,SYSSCR	; no, fix up screen
 	call	SELMDM		; select modem
-	call	FLSMDM		; purge any pending data
+	call	PURMDM		; purge any pending input data
 	call	SELCON		; select console again.
 	ret	
 
@@ -2979,12 +2964,12 @@ FINMES:	ld	a,(QUIETD)	; a quiet display?
 	ld	e,SPACE		; send a space or two
 	call	OUTCON
 	call	OUTCON
-	jp	FLSCON		; and exit back
+	jp	FLSCON		; flush output and exit back
 
 FINME0:	; else for screaming screens...
 
 	push	de		; save message
-	call	SCRST		; position cursor
+	call	SCRST		; position cursor and clear to end of line
 	pop	de		; print the termination message
 	call	PRTSTR
 	jp	SCREND		; position cursor for prompt

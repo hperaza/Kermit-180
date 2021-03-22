@@ -199,6 +199,16 @@ Using Kermit-80 4.11 as the base version.
 - Server mode, get command: send correct error message to remote machine
   if file was not found.
 
-- New get/send/server screen layout.
+- New screen layout for file transfer operations.
+
+- Fixed SET COLLISION OVERWRITE for files with explicit version number.
+
+- Display received file name only after it is created and the version number
+  is known.
+
+
+22/03/21
+
+- Flush modem output in TELNET routine after sending every char.
 
 

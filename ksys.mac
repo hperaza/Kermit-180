@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 17, 22-Mar-2021 by H. Peraza: added function to flush modem output,
+;       as required for proper working of the CONNECT command.
+;
 ; edit 16, 21-Mar-2021 by H. Peraza: close all files at exit. Use PRTERR
 ;       routine to output error messages. New get/send/server screen layout.
 ;
@@ -124,7 +127,7 @@
 
 	.Z80
 
-	ident	/16/
+	ident	/17/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -141,7 +144,7 @@
 	public	SYSINH,INHLPS,SYSINT,SYSFLT,MDMFLT,PRTFLT,SYSBYE
 	public	SYSSPD,SPDTBL,SPHTBL,SYSPRT,INPCON,INPMDM,LPTSTAT
 	public	GETCON,FLSCON,FLSMDM,OUTLPT,DELCHR,CLRLIN,TTAB
-	public	TTYTYP,DELAY,EXTERN
+	public	PURMDM,TTYTYP,DELAY,EXTERN
 
 	public	SYSVER,DIR,ERA,COPY,RENAME,TYPE,CKCHR,MFINIT
 	public	MFNAME,MFEND,SFCB,FCB,FCB2,OPENR,OPENRW,CREATF
@@ -177,7 +180,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (16) 21-Mar-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (17) 22-Mar-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -704,7 +707,7 @@ GC2:	pop	ix
 	ret
 
 ; Output character in E to the console.
-; Destroys BC, DE, HL
+; Destroys C, preserves E.
 
 OUTCON:	ld	c,e
 	call	PUTCH		; use SYSLIB routine
@@ -793,25 +796,30 @@ QEMPTY:	ld	a,(ix+TQ.IP)	; are input
 OUTMDM:	push	hl		; save registers
 	push	de
 	push	bc
-	call	OUTM0		; output char
+	call	OUTMD		; output char
 	pop	bc
 	pop	de
 	pop	hl		; restore registers
 	ret			; and return
 
-OUTM0:	ld	hl,(OPTR)	; load output buffer pointer
+OUTMD:	ld	hl,(OPTR)	; load output buffer pointer
 	ld	(hl),e		; store character
 	inc	hl		; advance pointer
 	ld	(OPTR),hl	; save it back
 	ld	a,(OCNT)	; get char counter
 	inc	a		; increase it
 	ld	(OCNT),a	; save it back
-	cp	128		; is buffer bull?
-	jr	z,OUTM1		; yes
+	cp	128		; is buffer full?
+	jr	z,FLSMDM	; yes, send it
 	ld	a,e		; no, check character
 	cp	CR		; carriage return?
 	ret	nz		; no, return
-OUTM1:	ld	a,(OCNT)	; get number of characters in buffer
+	;...
+
+; Flush modem output.
+; Destroys HL.
+
+FLSMDM:	ld	a,(OCNT)	; get number of characters in buffer
 	ld	l,a
 	ld	h,0		; make it a 16-bit word
 	ld	(QIOMWR+Q.LEN),hl ; save for QIO request
@@ -888,13 +896,13 @@ INPM3:	ld	hl,(ISB+2)	; else process what we got
 INPM4:	xor	a		; here on error, return zero
 	ret
 
-; Flush comm line.
+; Purge comm input line.
 ; Modem is selected.
 ; Currently, just gets characters until none are available.
 
-FLSMDM:	call	INPMDM		; try to get a character
+PURMDM:	call	INPMDM		; try to get a character
 	or	a		; got one?
-	jr	nz,FLSMDM	; if so, try for another
+	jr	nz,PURMDM	; if so, try for another
 	ret			; receiver is drained, return
 
 ; Get the printer status. Return A = 0FFh if OK, or 0 if not.
@@ -2214,6 +2222,8 @@ OPENR:	call	CLOSEF		; just in case
 	ld	hl,QFRAT
 	SC	.QIO		; read attributes
 	jr	c,opne1
+	ld	a,FN.DEV OR FN.DIR OR FN.NAME OR FN.EXT OR FN.VER
+	ld	(FCB+F.ATTR),a	; now we have all bits
 	ld	a,(IOSB)
 	or	a
 	ret	z
@@ -2248,6 +2258,8 @@ OPENRW:	call	CLOSE2		; just in case
 	ld	hl,QFRAT2
 	SC	.QIO		; read attributes
 	jr	c,opne2
+	ld	a,FN.DEV OR FN.DIR OR FN.NAME OR FN.EXT OR FN.VER
+	ld	(FCB2+F.ATTR),a	; now we have all bits
 	ld	a,(IOSB)
 	or	a
 	ret	z
@@ -2280,6 +2292,8 @@ CREATF:	call	CLOSE2		; just in case
 	ld	hl,QFRAT2
 	SC	.QIO		; read attributes
 	jr	c,opne3
+	ld	a,FN.DEV OR FN.DIR OR FN.NAME OR FN.EXT OR FN.VER
+	ld	(FCB2+F.ATTR),a	; now we have all bits
 	ld	a,(IOSB)
 	or	a
 	ret	z

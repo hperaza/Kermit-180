@@ -42,7 +42,7 @@
 	public	SRVVER,SERVER
 
 	extrn	KERMIT,RPACK,SPACK,NAK,NAK0,ACKP,SEND1,READ1,SPAR
-	extrn	SNDERR,CSRPOS,SCREND
+	extrn	SNDERR,CSRPOS,SCREND,FINMES
 
 	extrn	SRVFLG,ARGBLK,DATA,NUMPKT,PKTNUM,NUMRTR,NUMTRY,CURCHK
 	extrn	SFCB,QUIETD
@@ -175,6 +175,9 @@ SERV6:	cp	'N'		; NAK?
 	jp	z,SERVER	; yes, ignore
 
 SERV7:	ld	de,ERMS1
+	push	de
+	call	FINMES		; display error message
+	pop	de
 	call	SNDERR		; send Error packet
 	jp	SERVER		; restart server
 
