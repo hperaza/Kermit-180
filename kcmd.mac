@@ -238,7 +238,7 @@ CMTXT1:	call	CMGTCH		; get a char
 	jp	p,CMTX3		; no, put in user space
 	and	7Fh		; turn off sign bit
 	cp	ESC		; an escape?
-	jp	nz,CMTXT2	; no
+	jr	nz,CMTXT2	; no
 	ld	e,BELL		; get a bell
 	call	OUTCON
 	xor	a
@@ -249,10 +249,10 @@ CMTXT1:	call	CMGTCH		; get a char
 	ld	(CMDPTR),hl
 	ld	hl,CMCCNT	; get the char count
 	dec	(hl)		; decrement it by one
-	jp	CMTXT1		; try again
+	jr	CMTXT1		; try again
 
 CMTXT2:	cp	'?'		; is it a question mark?
-	jp	z,CMTXT4	; if so put it in the text
+	jr	z,CMTXT4	; if so put it in the text
 	cp	FF		; is it a formfeed?
 	call	z,CLRTOP	; if so blank the screen
 	ld	a,b		; return the count
@@ -261,13 +261,13 @@ CMTXT2:	cp	'?'		; is it a question mark?
 	jp	RSKP		; return success
 
 CMTX3:	cp	'\'		; slash?
-	jp	nz,CMTX3A	; nope, so try something else
+	jr	nz,CMTX3A	; nope, so try something else
 	ld	a,(SLSHSN)	; a slash already entered?
 	and	a
 	cpl
-	jp	nz,CMTX3A	; yes, so assume its a valid slash to enter
+	jr	nz,CMTX3A	; yes, so assume its a valid slash to enter
 	ld	(SLSHSN),a	; make sure the flag is set for next time routnd
-	jp	CMTXT1		; get another character
+	jr	CMTXT1		; get another character
 
 CMTX3A:
 ;	ld	hl,CMAFLG	; point to the action flag
@@ -276,11 +276,11 @@ CMTX3A:
 	ld	a,(SLSHSN)	; slash already entered?
 	and	a		; test flag
 	ld	a,e		; restore it in case...
-	jp	z,CMTX5		; not a slash seen, so enter as a normal character
+	jr	z,CMTX5		; not a slash seen, so enter as a normal character
 	cp	'\'
-	jp	nz,CMTX3B	; \\ not detected
+	jr	nz,CMTX3B	; \\ not detected
 	ld	a,(SLASHN)	; else get number
-	jp	CMTX5B		; and enter it ( in the case of \n or \nn)
+	jr	CMTX5B		; and enter it ( in the case of \n or \nn)
 
 	; here if an octal number of 1 or 2 digits entered instead of 3,
 	; followed by \ again
@@ -301,8 +301,8 @@ CMTX3B:	sub	'0'		; else it should be an octal number
 	ld	(SLASHC),a	; plus one. If three then a number entered
 	cp	3
 	ld	a,(SLASHN)	; get the number in case...
-	jp	z,CMTX5
-	jp	CMTXT1		; else loop
+	jr	z,CMTX5
+	jr	CMTXT1		; else loop
 
 CMTXT4:	ld	hl,(CMDPTR)	; get a pointer into the buffer
 	inc	hl		; bump past '?'
@@ -342,21 +342,19 @@ CMNUM0:	call	CMGTCH		; get another character
 	jp	p,CMNUM1	; nope, so (possibly) valid input
 	and	7Fh		; else lets see what it is...
 ;	cp	ESC		; do not know what to do with this one...
-	cp	' '		; if it is a space then either a return or more
-	jp	nz,CMNUM2	; else
-	jp	RSKP		; space is a deliminter
-CMNUM2:	cp	'?'		; user is curious
-	jp	z,GNUM2
+	cp	' '		; if it is a space
+	jp	z,RSKP		;  then return OK (space is a delimiter)
+	cp	'?'		; user is curious
+	jr	z,GNUM2
 	cp	CR		; end of input?
-	jp	z,CMNUMX
-GNUM1:	jp	PRSERR		; did not understand this, so error
-CMNUMX:	jp	RSKP		; return OK
+	jp	z,RSKP		; yes, return OK
+	jp	PRSERR		; did not understand this, so error
 
 GNUM2:	ld	hl,(NUMBER)	; get the number.. if at all entered
 	ld	a,l
 	or	h		; if HL = 0 then possibly no number entered
 	ld	de,CMIN02	; say confirm... or more on line
-	jp	nz,GNUM21	; else say enter a return
+	jr	nz,GNUM21	; else say enter a return
 	ld	de,CMIN01	; say enter a number
 GNUM21:	call	PRTSTR		; say it
 	call	PRCRLF		; do a LF
@@ -376,9 +374,9 @@ GNUM21:	call	PRTSTR		; say it
 
 CMNUM1:	and	7Fh		; here for a (potentially) valid number
 	sub	'0'		; less ASCII bias
-	jp	c,GNUM3
+	jr	c,GNUM3
 	cp	10		; if 10 or more its still bad
-	jp	nc,GNUM3
+	jr	nc,GNUM3
 	ccf	
 	ld	hl,(NUMBER)	; now multiply number by ten and add the new value
 	push	hl
@@ -928,7 +926,7 @@ CMGTC1:	ld	a,(CMAFLG)
 	jr	nz,CMGTC3
 CMGTC2:	ld	a,(CMSFLG)	; get the space flag
 	or	a		; was the last char a space?
-	jp	nz,CMGTC1	; yes, get another char
+	jr	nz,CMGTC1	; yes, get another char
 	ld	a,0FFh		; set the space flag
 	ld	(CMSFLG),a
 	ld	a,' '
@@ -990,9 +988,9 @@ CMNB11:	ld	a,(CMQFLG)	; do we want it echoed?
 	inc	hl
 	ld	(CMCPTR),hl
 	cp	CTRLU		; is it a ^U?
-	jp	z,CMNB12	; yes
+	jr	z,CMNB12	; yes
 	cp	CTRLX		; is it a ^X?
-	jp	nz,CMINB2
+	jr	nz,CMINB2	; no
 CMNB12:	call	CLRLIN		; clear the line
 	call	PRPRMP		; reprint the prompt
 	ld	hl,CMDBUF
@@ -1002,9 +1000,9 @@ CMNB12:	call	CLRLIN		; clear the line
 	jp	REPARS		; go start over
 
 CMINB2:	cp	BS		; Backspace?
-	jp	z,CMINB3
+	jr	z,CMINB3
 	cp	DEL		; or Delete?
-	jp	nz,CMINB4
+	jr	nz,CMINB4
 CMINB3:	ld	a,(CMCCNT)	; decrement the char count by two
 	dec	a
 	dec	a
@@ -1025,15 +1023,15 @@ CMNB32:	ld	hl,(CMCPTR)	; get the pointer into the buffer
 	jp	REPARS		; go reparse everything
 
 CMINB4:	cp	'?'		; is it a question mark?
-	jp	z,CMINB6
+	jr	z,CMINB6
 	cp	ESC		; is it an escape?
-	jp	z,CMINB6
+	jr	z,CMINB6
 	cp	CR		; is it a carriage return?
-	jp	z,CMINB5
+	jr	z,CMINB5
 	cp	LF		; is it a line feed?
-	jp	z,CMINB5
+	jr	z,CMINB5
 	cp	FF		; is it a formfeed?
-	jp	nz,CMINB8	; no - just store it and 
+	jr	nz,CMINB8	; no - just store it and 
 	call	CLRTOP
 CMINB5:	ld	a,(CMBFLG)	; allowing initial blank word (<CR>)?
 	or	a

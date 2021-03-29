@@ -271,8 +271,9 @@
 
 	extrn	BANNER,VTFLG,TAKFLG,BUFSEC,PRNFL,LOGNAM,LOGFCB,GTRXFL
 	extrn	CMBFLG,CMQFLG,CBUFF,CBPTR,NEXITF,INITAK,REMTXT,CURDEV
-	extrn	CURDIR,NUMBER,STBUFF,STRCNT,REPCNT,ERRORC,LOGFLG
-	extrn	TAKNAM,TAKFCB,TAKCNT,TAKPTR,TTYTYP,FCB,SRVFLG
+	extrn	CURDIR,NUMBER,STBUFF,STRCNT,REPCNT,ERRORC,LOGFLG,FCB
+	extrn	TAKNAM,TAKFCB,TAKCNT,TAKPTR,TTYTYP,SRVFLG,SRVTXT
+	extrn	OUTCON,OPROC
 
 	extrn	ERMS15
 
@@ -343,6 +344,9 @@ KERMIT:	ld	SP,STACK	; get new stack pointer, old one might be bad
 	ld	(CMBFLG),a	; initial keyword must not be blank
 	ld	(CMQFLG),a	; allow character-echoing during commands
 	ld	(REMTXT),a	; clear remote-text-to-screen flag
+	ld	(SRVTXT),a	; clear send-server-text flag
+	ld	hl,OUTCON
+	ld	(OPROC),hl	; set default output to console
 	ld	a,(SRVFLG)
 	or	a		; are we in server mode?
 	jp	nz,SERVER	; yes

@@ -824,15 +824,15 @@ REMCLX:	ld	a,b		; get accumulated text length
 RMSTAB:	defb	7		; seven entries
 	defb	16,'BLOCK-CHECK-TYPE',0
 	defw	REMSBC		; Remote Set Block Check
-	defb	4,'FILE',0
+	defb	4, 'FILE',0
 	defw	REMSFL		; Remote Set File
 	defb	10,'INCOMPLETE',0
 	defw	REMSFI		; Remote Set (file) Incomplete
-	defb	7,'RECEIVE',0
+	defb	7, 'RECEIVE',0
 	defw	REMSRC		; Remote Set Receive
-	defb	7,'REPLACE',0
+	defb	7, 'REPLACE',0
 	defw	REMSFR		; Remote Set (file) Replace
-	defb	5,'RETRY',0
+	defb	5, 'RETRY',0
 	defw	REMSRY		; Remote Set Retry
 	defb	14,'SERVER-TIMEOUT',0
 	defw	REMSST		; Remote Set Server Timeout
@@ -851,19 +851,19 @@ RMSHLP:	defb	CR,LF,'BLOCK-CHECK-TYPE for a remote server'
 RSFTAB:	defb	8		; eight entries
 	defb	10,'BLOCK-SIZE',0
 	defw	REMSBS		; Remote Set File Block-size command
-	defb	9,'COLLISION',0
+	defb	9, 'COLLISION',0
 	defw	REMSFC		; Remote Set File Collision command
 	defb	10,'INCOMPLETE',0
 	defw	REMSFI		; Remote Set File Incomplete command
-	defb	5,'NAMES',0
+	defb	5, 'NAMES',0
 	defw	REMSFN		; Remote Set File Names command
 	defb	13,'RECORD-FORMAT',0
 	defw	REMSRF		; Remote Set File Record-format
 	defb	13,'RECORD-LENGTH',0
 	defw	REMSRL		; Remote Set File Record-length
-	defb	7,'REPLACE',0
+	defb	7, 'REPLACE',0
 	defw	REMSFR		; Remote Set File Replace command
-	defb	4,'TYPE',0
+	defb	4, 'TYPE',0
 	defw	REMSFT		; Remote Set File Type command
 
 RSFHLP:	defb	CR,LF,'BLOCK-SIZE of files for a remote server'

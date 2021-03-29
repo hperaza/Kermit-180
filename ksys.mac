@@ -20,6 +20,11 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 18, 28-Mar-2021 by H. Peraza: the DIR routine now uses OUTCHR and
+;       OUTSTR for thext output. In server mode, the routines capture the
+;       output of DIR and sends it as a series of D-packets to the remote
+;       client.
+;
 ; edit 17, 22-Mar-2021 by H. Peraza: added function to flush modem output,
 ;       as required for proper working of the CONNECT command.
 ;
@@ -127,7 +132,7 @@
 
 	.Z80
 
-	ident	/17/
+	ident	/18/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -146,20 +151,21 @@
 	public	GETCON,FLSCON,FLSMDM,OUTLPT,DELCHR,CLRLIN,TTAB
 	public	PURMDM,TTYTYP,DELAY,EXTERN
 
-	public	SYSVER,DIR,ERA,COPY,RENAME,TYPE,CKCHR,MFINIT
+	public	SYSVER,DIR,DIR2,ERA,COPY,RENAME,TYPE,CKCHR,MFINIT
 	public	MFNAME,MFEND,SFCB,FCB,FCB2,OPENR,OPENRW,CREATF
 	public	CLOSEF,CLOSE2,READF,READF2,SEEK2,WRITEF,DELET2
-	public	OPENTK,READTK,CLSETK,SETFCB,ALUN
+	public	OPENTK,READTK,CLSETK,SETFCB,ALUN,CHDIR,DSKFRE
 
-	public	ERMS15,SFCB,HIDEFS
+	public	ERMS15,SFCB,HIDEFS,FREBKS
 
 	extrn	KERMIT,COMND,NOUT,GETFIL,INBUF,PRCRLF,PRNFL,STRLEN
 	extrn	STRCPY,CPYNAM,RSKP,DEVSTR,DIRSTR,OUTPRN,PRTERR
+	extrn	OUTCHR,OUTSTR
 
 	extrn	VERSION,BANNER,RSXVER,CURDEV,CURDIR,$MEMRY,BUFADR
 	extrn	BUFSEC,BUFLEN,BUFPNT,MAXBSC,DBGFLG,HOSTNM,PORT
 	extrn	TEMP1,NUMBER,CHRCNT,TAKFLG,TAKBUF,TAKFCB,FNBUF
-	extrn	FCBS2
+	extrn	FCBS2,SRVFLG
 
 	extrn	ATTACH,DETACH,PUTCH,PUTSTR,TTLUN,TTFLSH,UCASE
 	extrn	CPHLDE,CVTBD,CVTLD,BCD2BIN,CVTBH
@@ -180,7 +186,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (17) 22-Mar-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (18) 28-Mar-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -314,8 +320,8 @@ SINIT7:	ld	de,NOROOM	; not enough room for buffers
 	ld	hl,EX.SEV	; and return with error status
 	SC	.EXIT
 
-NOROOM:	defb	LF,'KER -- Not enough room for',CR,0
-SYSMSG:	db	'on RSX',0,'80 V',0
+NOROOM:	defb	LF,'KER -- Not enough room',CR,0
+SYSMSG:	defb	'on RSX',0,'80 V',0
 
 ; System-dependent termination.
 
@@ -711,6 +717,7 @@ GC2:	pop	ix
 
 OUTCON:	ld	c,e
 	call	PUTCH		; use SYSLIB routine
+	or	a
 	ret
 
 ; Flush any pending console output.
@@ -1025,6 +1032,45 @@ VT100:	defb	'VT100',0	; TTYTYP
 
 EXTERN:	jp	0		; none
 
+; Change directory to the one specified in FCB.
+
+CHDIR:	ld	a,(FCB+F.ATTR)
+	and	FN.DEV		; was a device specified?
+	jr	z,CHD2		; no, skip
+	ld	hl,FCB+F.DEV
+	ld	b,LUNTMP
+	call	ALUN		; assign LUN
+	ret	c		; on error, return
+	push	hl
+	pop	ix
+	bit	DV.DIR,(ix+4)	; directory device?
+	ld	a,E.BADOP
+	scf
+	ret	z		; no, error
+	ld	hl,FCB+F.DEV
+	ld	de,CURDEV
+	ld	bc,3
+	ldir			; yes, set new device name
+CHD2:	ld	a,(FCB+F.ATTR)
+	ld	c,a
+	and	FN.DIR		; directory specified?
+	ld	hl,FCB+F.DIR
+	jr	nz,CHD3		; yes
+	ld	a,c
+	and	FN.NAME		; else try filename
+	ld	a,E.BADOP
+	scf
+	ret	z		; nope
+	ld	hl,FCB+F.NAME
+CHD3:	;*TODO: ensure directory exists on CURDEV?
+	ld	de,CURDIR
+	ld	bc,9
+	ldir			; copy directory name
+	ld	hl,CURDIR
+	ld	c,SD.TSK
+	SC	.SDIR		; set task's current directory
+	ret
+
 ; This is the DIR command.  Display the name and size of all files matching
 ; the filespec.
 ; Here from: KERMIT
@@ -1035,7 +1081,12 @@ EXTERN:	jp	0		; none
 DIR:	ld	de,SFCB		; where to put the data, if any.
 	ld	a,CMIFIN
 	call	COMND		; parse a full or piece of file-spec
-	jp	DIR2		; ignore errors
+	jp	DIR1		; ignore errors
+DIR1:	call	DIR2
+	jp	KERMIT
+
+; The actual directory display routine. Called also from SERVER.
+
 DIR2:	call	MFINIT		; init file search
 	jp	c,DIRERR
 
@@ -1044,20 +1095,30 @@ DIR2:	call	MFINIT		; init file search
 	ld	hl,IXFCB
 	call	nz,OPNSYS	; yes, open index file to read file attributes
 
-	ld	de,INMS14	; print signon message
-	call	PRTSTR
+	ld	a,(SRVFLG)
+	or	a		; server mode?
+	jr	nz,DIR2A	; yes, skip header
+	ld	de,INMS14	; print header message
+	call	OUTSTR
+	jp	c,DIRERR
 	ld	hl,FNBUF
 	push	hl
 	ld	de,SFCB+F.DEV
-	call	DEVSTR
+	call	DEVSTR		; copy device name
 	ld	de,SFCB+F.DIR
-	call	DIRSTR
+	call	DIRSTR		; copy directory name
+	ld	(hl),CR
+	inc	hl
+	ld	(hl),LF
+	inc	hl
+	ld	(hl),LF
+	inc	hl
+	ld	(hl),0
 	pop	de
-	call	PRTSTR		; follow with current device and dir
-	call	PRCRLF
-	call	PRCRLF
+	call	OUTSTR		; output string
+	jp	c,DIRERR
 
-	ld	c,3		; number of names per line
+DIR2A:	ld	c,3		; number of names per line
 	ld	b,25		; name width
 	ld	a,(HIDEFS)	; long directory listing?
 	or	a
@@ -1094,14 +1155,16 @@ DIR6A:	; print an entry
 	call	FCBS2		; convert name to string
 	pop	de
 	push	de
-	call	PRTSTR		; display string
+	call	OUTSTR		; display string
 	pop	hl
+	jp	c,DIRERR
 	call	STRLEN
 	ld	a,(DIRW)	; get width
 	sub	b
 	ld	b,a
 DIR6B:	ld	e,' '		; pad name
-	call	OUTCON		;  with spaces
+	call	OUTCHR		;  with spaces
+	jp	c,DIRERR
 	djnz	DIR6B		;   up to the desired width
 
 	ld	hl,(NFILES)
@@ -1115,7 +1178,8 @@ DIR6B:	ld	e,' '		; pad name
 	ld	hl,NNAMS	; point to names counter
 	dec	(hl)		; one less on this line
 	jr	nz,DIR5
-	call	PRCRLF		; CR/LF needed
+	call	OUTNL		; CR/LF needed
+	jp	c,DIRERR
 	ld	a,(FPLN)
 	ld	(NNAMS),a	; reset number of names per line
 	jp	DIR5		; loop
@@ -1129,17 +1193,22 @@ DIR17:	; done with directory, display free space remaining on device
 
 	ld	a,(NNAMS)	; check files per line counter
 	ld	hl,FPLN
-	cp	(hl)		; last line is complete?
-	call	nz,PRCRLF	; no, an extra newline is needed
+	cp	(hl)		; is last line complete?
+	call	nz,OUTNL	; no, an extra newline is needed
+	jp	c,DIRERR
 
+	ld	a,(SRVFLG)	; server mode?
+	or	a
+	ret	nz		; yes, return
 	ld	a,(HIDEFS)	; long directory listing?
 	or	a
-	jr	z,DIR18		; no, return
+	ret	z		; no, return
 
 	call	DSKFRE		; else compute free disk space
-	jr	c,DIR18		; on error, return
+	jp	c,DIRERR	; on error, return
 
-	call	PRCRLF
+	call	OUTNL
+	jp	c,DIRERR
 	ld	hl,FNBUF
 	push	hl
 	ld	bc,(NFILES)	; get number of files listed
@@ -1149,10 +1218,12 @@ DIR17:	; done with directory, display free space remaining on device
 	call	CVTLD		; convert to decimal
 	ld	(hl),0		; end with a null
 	pop	de
-	call	PRTSTR		; display the value
+	call	OUTSTR		; display the value
+	jp	c,DIRERR
 
 	ld	de,INMS15	; " files, "
-	call	PRTSTR
+	call	OUTSTR
+	jp	c,DIRERR
 	push	de
 	ld	a,(FREBKS)	; get number of free blocks
 	ld	hl,(FREBKS+1)
@@ -1167,21 +1238,25 @@ DIR17:	; done with directory, display free space remaining on device
 	call	CVTLD		; convert value to decimal
 	ld	(hl),0		; end with a null
 	pop	de
-	call	PRTSTR		; display the result
+	call	OUTSTR		; display the result
 	pop	de
+	jp	c,DIRERR
 	inc	de		; " bytes free"
-	call	PRTSTR
-
-	; all done, return via jmp (as for all main commands)
-
-DIR18:	jp	KERMIT		; return to kermit
+	call	OUTSTR
+	ret	nc		; all done, return
 
 DIRERR:	call	MFEND		; close directory
 	call	CLOSYS
 
 	;*TODO: display error message
 
-	jp	KERMIT
+	ret
+
+OUTNL:	ld	e,CR
+	call	OUTCHR
+	ret	c
+	ld	e,LF
+	jp	OUTCHR
 
 INMS14:	db	CR,LF,LF,'Directory ',0
 INMS15:	db	' file(s), ',0,' byte(s) free',CR,LF,0
@@ -1235,7 +1310,8 @@ DIR25B:	ld	c,e
 	call	CVTLD		; convert long value to string
 	ld	(hl),0
 	pop	de
-	call	PRTSTR		; output value
+	call	OUTSTR		; output value
+	ret	c
 
 	ld	de,FNBUF
 	push	de
@@ -1246,7 +1322,7 @@ DIR25B:	ld	c,e
 	xor	a
 	ld	(de),a		; end string with a null
 	pop	de
-	jp	PRTSTR		; and display it
+	jp	OUTSTR		; and display it
 
 ; Collect disk block usage statistics.
 

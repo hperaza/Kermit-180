@@ -498,8 +498,8 @@ PRTCH2:	ld	a,e		; normal text
 
 PRTCH1:	cp	VTDEFE		; are we doing external emulation?
 	jp	nz,PRTCH3	; assume we continue on
-	ld	hl,EXTERN+1	; get address of external emulator
-	ld	a,h		; se if address = 0 (not implemented)
+	ld	hl,(EXTERN+1)	; get address of external emulator
+	ld	a,h		; see if address = 0 (not implemented)
 	or	l
 	jp	z,PRTCH3	; not external, assume we just carry on
 	jp	(hl)		; go do external emulation, ret back to caller
@@ -526,7 +526,7 @@ PRTCH4:	call	SYSFLT		; OK to print this character (in E)?
 	ld	a,(PRNFLG)	; get Print parallel flag
 	or	a
 	call	nz,OUTLPT	; output to printer if flag set
-	call	OUTCON		; output to console.
+	call	OUTCON		; output to console (char still in E)
 	ld	hl,PRTCNT	; point to prt fairness count
 	inc	(hl)		; bump
 	ld	a,(hl)		; get it in A

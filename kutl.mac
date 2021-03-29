@@ -19,6 +19,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 34, 28-Mar-2021 by H. Peraza: new OUTCHR and OUTSTR routines allow
+;       directing text output to the packet send routine in server module.
+;
 ; edit 33, 21-Mar-2021 by H. Peraza: added PRTERR routine to output error
 ;       messages preceded by a newline.
 ;
@@ -218,7 +221,7 @@
 
 	.Z80
 
-	ident	/33/
+	ident	/34/
 
 	include	KDEF.INC
 	include	FCB.INC
@@ -228,7 +231,7 @@
 	public	PAUSIT,INPCT,P20LN,DEVSTR,DIRSTR,CLOFIL,INBUF
 	public	OUTBUF,OUTPRN,GETFIL,MAKFIL,APPFIL,SKPNAM,FCBS2
 	public	SNDXON,SNDXOFF,IN1CHR,ADDHLA,FCBSTR,STRLEN,GETCT
-	public	MAKFI1,PRTERR,STRCPY,CPYNAM,R,RSKP
+	public	MAKFI1,PRTERR,STRCPY,CPYNAM,OUTCHR,OUTSTR,R,RSKP
 
 	extrn	PRTSTR,OUTCON,COMND,KERMIT,KERMT3,OUTLPT,LPTSTAT
 	extrn	OUTMDM,OPENR,OPENRW,CREATF,READF,READF2,WRITEF
@@ -238,12 +241,12 @@
 
 	extrn	PARITY,ESCCHR,TEMP1,NQUIET,FLOCTL,CHRCNT,EOFLAG
 	extrn	BUFADR,BUFPNT,BUFSEC,CMDBUF,TAKFLG,TAKBUF,TAKPTR
-	extrn	CBUFF,CBPTR,PRNBUF,HOSTHS,CURDEV,CURDIR,TAKCNT
-	extrn	FCB2,FNBUF
+	extrn	CBPTR,PRNBUF,HOSTHS,CURDEV,CURDIR,TAKCNT,FCB2,FNBUF
+	extrn	OPROC
 
 	cseg
 
-UTLVER:	defb	'KUTL (33) 21-Mar-2021',0
+UTLVER:	defb	'KUTL (34) 28-Mar-2021',0
 
 ; Set the parity for a character in A.
 ; Called by: SPACK, REXMIT, LOGIT, VT52, CONCHR, INTCHR
@@ -1080,6 +1083,28 @@ PRTERR:	push	de		; save pointer
 	call	PRCRLF		; output newline
 	pop	de		; restore pointer
 	jp	PRTSTR		; output message
+
+; Send character to the console or to remote server, depending on current
+; mode.
+
+OUTCHR:	push	hl		; save HL
+	ld	hl,(OPROC)	; get output routine address
+	ex	(sp),hl		; restore HL, push routine address
+	ret			; exec routine
+
+; Display string on console, or send it to remote server, depending on
+; current mode
+
+OUTSTR:	ld	a,(de)		; get character from string
+	or	a		; null?
+	ret	z		; yes, return
+	push	de		; save string pointer
+	ld	e,a		; get character into E
+	call	OUTCHR		; output character
+	pop	de		; restore string pointer
+	ret	c		; on error return
+	inc	de		; point to next char
+	jr	OUTSTR		; and loop
 
 	dseg
 

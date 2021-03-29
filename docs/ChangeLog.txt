@@ -212,3 +212,14 @@ Using Kermit-80 4.11 as the base version.
 - Flush modem output in TELNET routine after sending every char.
 
 
+28/03/21
+
+- Got the Server DIRECTORY command working: the output of the DIR routine
+  is captured and sent to the remote client in a series of D packets.
+
+
+29/03/21
+
+- Implemented the Server CD and SPACE commands.
+
+

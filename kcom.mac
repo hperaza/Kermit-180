@@ -20,7 +20,10 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 15, 6-Jan-2021 by H. Peraza: use PRTERR to output error messages.
+; edit 16, 29-Mar-2021 by H. Peraza: CHDIR routine moved to the system-
+;       dependent module.
+;
+; edit 15, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
 ;
 ; edit 14, 6-Jan-2021 by H. Peraza: converted to Z80, targeting RSX180/280.
 ;       Null now marks the end of strings, so we can use SYSLIB routines.
@@ -116,7 +119,7 @@
 
 	.Z80
 
-	ident	/14/
+	ident	/16/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -129,7 +132,7 @@
 	extrn	KEYCMD,COMND,KERMIT,PRTSTR,SELCON,OUTCON,ESCPR
 	extrn	SETPAR,CFMCMD,NOUT,PRCRLF,SYSSPD,SYSPRT,CLRTOP
 	extrn	SELMDM,OUTMDM,GETCT,DEVSTR,DIRSTR,FCBSTR,ALUN
-	extrn	PRTERR
+	extrn	CHDIR,PRTERR
 
 	extrn	AUTORC,CHKTYP,NUMBER,MAXBSC,BUFSEC,STBUFF,DBGFLG
 	extrn	TACFLG,STRCNT,SNDSOP,SPSIZ,SDCKT,RCVSOP,RPSIZ
@@ -144,7 +147,7 @@
 
 	cseg
 
-COMVER:	defb	'KCOM (14)  6-Jan-2021',0	; name, edit no. and date
+COMVER:	defb	'KCOM (16) 29-Mar-2021',0	; name, edit no. and date
 
 ; This is the SET command.
 
@@ -256,9 +259,9 @@ BLKSET:	ld	de,BLKTAB	; get the address of the block-check table
 	jp	KERMIT		; go get another command
 
 BLKTAB:	defb	3		; three entries
-	defb	20,	'1-CHARACTER-CHECKSUM',0,	'1','1'
-	defb	20,	'2-CHARACTER-CHECKSUM',0,	'2','2'
-	defb	21,	'3-CHARACTER-CRC-CCITT',0,	'3','3'
+	defb	20,'1-CHARACTER-CHECKSUM',0,	'1','1'
+	defb	20,'2-CHARACTER-CHECKSUM',0,	'2','2'
+	defb	21,'3-CHARACTER-CRC-CCITT',0,	'3','3'
 
 BLKHLP:	defb	CR,LF,'1-CHARACTER-CHECKSUM'
 	defb	CR,LF,'2-CHARACTER-CHECKSUM'
@@ -302,44 +305,13 @@ SETCWD:	ld	de,FCB
 	ld	a,CMIFIN	; get "file-spec" silently
 	call	COMND
 	jp	SETDI1
-SETDI1:	ld	a,(FCB+F.ATTR)
-	and	FN.DEV		; was a device specified?
-	jr	z,SETDI2	; no, skip
-	ld	hl,FCB+F.DEV
-	ld	b,LUNTMP
-	call	ALUN		; assign LUN
-	jr	c,SETDI4	; branch on error
-	push	hl
-	pop	ix
-	bit	DV.DIR,(ix+4)	; directory device?
-	jr	z,SETDI4	; no, error
-	ld	hl,FCB+F.DEV
-	ld	de,CURDEV
-	ld	bc,3
-	ldir			; yes, set new device name
-SETDI2:	ld	a,(FCB+F.ATTR)
-	ld	c,a
-	and	FN.DIR		; directory specified?
-	ld	hl,FCB+F.DIR
-	jp	nz,SETDI3	; yes
-	ld	a,c
-	and	FN.NAME		; else try filename
-	jp	z,KERMIT	; nope
-	ld	hl,FCB+F.NAME
-SETDI3:	;*TODO: ensure directory exists on CURDEV?
-	ld	de,CURDIR
-	ld	bc,9
-	ldir			; copy directory name
-	ld	hl,CURDIR
-	ld	c,SD.TSK
-	SC	.SDIR		; set task's current directory
-	jp	KERMIT		; all done
-
-SETDI4:	ld	de,ERMS32	; "invalid device"
+SETDI1:	call	CHDIR		; change directory
+	jp	nc,KERMIT	; success
+	ld	de,ERMS32	; "operation failed"
 	call	PRTERR		; print error message
 	jp	KERMIT		; and die
 
-ERMS32:	db	'?Invalid device',0
+ERMS32:	db	'?Operation failed',0
 
 ; SET SEND command.  Sort of supported
 
@@ -444,8 +416,8 @@ STRCTB:	defb	4		; four entries
 	defw	STRSOP
 	defb	13,'PACKET-LENGTH',0
 	defw	STRPKS
-;	defb	9,'CHECKTYPE',0	;
-;	defw	STRCKT		;
+;	defb	9, 'CHECKTYPE',0
+;	defw	STRCKT
 
 ; SET RECEIVE START-OF-PACKET  
 
@@ -588,8 +560,8 @@ SETCOL:	ld	de,COLTAB	; table address
 	jp	KERMIT		; back to main loop
 
 COLTAB:	defb	3		; 3 entries
-	defb	7,'DISCARD',0,		02h,02h
-	defb	9,'OVERWRITE',0,	00h,00h
+	defb	7, 'DISCARD',0,		02h,02h
+	defb	9, 'OVERWRITE',0,	00h,00h
 	defb	11,'NEW-VERSION',0,	01h,01h
 
 COLHLP:	defb	CR,LF,'DISCARD incoming files'
@@ -675,9 +647,9 @@ SETFM:	ld	de,TYPTAB
 	jp	KERMIT
 
 TYPTAB:	defb	3		; three entries
-	defb	5, 'ASCII',0,	01h,01h
-	defb	6, 'BINARY',0,	02h,02h
-	defb	7, 'DEFAULT',0,	00h,00h	; Default
+	defb	5,'ASCII',0,	01h,01h
+	defb	6,'BINARY',0,	02h,02h
+	defb	7,'DEFAULT',0,	00h,00h	; Default
 
 TYPHLP:	defb	CR,LF,'ASCII	BINARY	DEFAULT'
 	defb	0
@@ -706,11 +678,11 @@ PARSET:	ld	de,PARTAB
 	jp	KERMIT
 
 PARTAB:	defb	5		; five entries.
-	defb	4, 'EVEN',0,	PAREVN,PAREVN
-	defb	4, 'MARK',0,	PARMRK,PARMRK
-	defb	4, 'NONE',0,	PARNON,PARNON
-	defb	3, 'ODD',0,	PARODD,PARODD
-	defb	5, 'SPACE',0,	PARSPC,PARSPC
+	defb	4,'EVEN',0,	PAREVN,PAREVN
+	defb	4,'MARK',0,	PARMRK,PARMRK
+	defb	4,'NONE',0,	PARNON,PARNON
+	defb	3,'ODD',0,	PARODD,PARODD
+	defb	5,'SPACE',0,	PARSPC,PARSPC
 
 PARHLP:	defb	CR,LF,'EVEN	MARK	NONE	ODD	SPACE',0
 
@@ -734,9 +706,9 @@ SETTC2:	ld	(TACFLG),a	; enable/disable TACtrap
 	jp	KERMIT
 
 TACTAB:	defb	3		; three entries.
-	defb	9,	'CHARACTER',0,	02h,02h
-	defb	3,	'OFF',0,	00h,00h
-	defb	2,	'ON',0,		01h,01h
+	defb	9,'CHARACTER',0,	02h,02h
+	defb	3,'OFF',0,		00h,00h
+	defb	2,'ON',0,		01h,01h
 
 TACHLP:	defb	CR,LF,'ON to enable TAC trap'
 	defb	CR,LF,'OFF to disable TAC trap'
@@ -788,12 +760,12 @@ VT52E3:	ld	(VTFLG),a	; else save new set parameter..
 ; Table with string entry, and the returned value as two identical bytes.
 
 STTERT:	defb	6		; six types
-	defb	4,'DUMB',0,	VTDEFD,VTDEFD; assume our terminal is thick
-	defb	8,'EXTERNAL',0,	VTDEFE,VTDEFE; assume off, but terminal is in dep. code
-	defb	5,'QUIET',0,	40h,40h; display quiet
-	defb	7,'REGULAR',0,	80h,80h; display loud
-	defb	3,'OFF',0,	VTDEFO,VTDEFO; assume our terminal does everything
-	defb	4,'VT52',0,	VTDEFV,VTDEFV; VT52 as before
+	defb	4,'DUMB',0,	VTDEFD,VTDEFD	; assume our terminal is thick
+	defb	8,'EXTERNAL',0,	VTDEFE,VTDEFE	; assume off, but terminal is in dep. code
+	defb	5,'QUIET',0,	40h,40h		; display quiet
+	defb	7,'REGULAR',0,	80h,80h		; display loud
+	defb	3,'OFF',0,	VTDEFO,VTDEFO	; assume our terminal does everything
+	defb	4,'VT52',0,	VTDEFV,VTDEFV	; VT52 as before
 
 STTERH:	defb	CR,LF,'DUMB - only printable characters passed to terminal'
 	defb	CR,LF,'EXTERNAL - with emulation code system-specific'
@@ -847,9 +819,11 @@ PRTS1:	ld	a,(FCB+F.ATTR)
 	;*TODO: handle errors
 	jp	KERMIT
 
-PRTS2:	ld	de,ERMS32	; "invalid device"
+PRTS2:	ld	de,ERMS33	; "invalid device"
 	call	PRTERR		; print error message
 	jp	KERMIT		; and die
+
+ERMS33:	db	'?Invalid device',0
 
 ; Subroutines for SET subcommands
 
@@ -861,8 +835,8 @@ PRTS2:	ld	de,ERMS32	; "invalid device"
 ;   error: no return to caller. print error message and return to main loop.
 
 ONTAB:	defb	2		; two entries.
-	defb	3, 'OFF',0,	00h,00h
-	defb	2, 'ON',0,	01h,01h
+	defb	3,'OFF',0,	00h,00h
+	defb	2,'ON',0,	01h,01h
 
 ONHLP:	defb	CR,LF,'OFF	ON',0
 
@@ -1466,7 +1440,7 @@ STLOP:	ld	a,(de)		; get byte
 	ld	a,(STRCNT)	; get the count
 	dec	a
 	ld	(STRCNT),a	; less one
-	jp	nz,STLOP	; else still looping
+	jr	nz,STLOP	; else still looping
 	call	SELCON		; re-select the console
 	jp	KERMIT
 

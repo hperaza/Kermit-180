@@ -21,6 +21,11 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 32, 28-Mar-2021 by H. Peraza: packet character encoding was moved
+;       into a separate ENCODE routine that can be called from the server
+;       code. SDATA and SEOF were also slightly modified to support server
+;       operation.
+;
 ; edit 31, 21-Mar-2021 by H. Peraza: display received file name only after
 ;       version number is known. Fixed SET COLLISION OVERWRITE.
 ;
@@ -234,7 +239,7 @@
 
 	.Z80
 
-	ident	/31/
+	ident	/32/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -243,6 +248,8 @@
 	public	PKTVER,READ,READ0,READ2,SEND,LOGO,LOGOUT,FINISH
 	public	NAK,NAK0,ACKP,COUNTP,ERROR,ERROR0,RPACK,SPACK
 	public	INIT,SINIT,SEND1,READ1,RINI2A,SPAR,SNDERR,FINMES
+	public	ENCODE,ERROR3,CBFPTR,OUTPKN,SDATA,SEOF,SEOT,COMPP
+	public	OUTRTR,UPDRTR
 
 	extrn	KERMIT,KERMT3,COMND,PRTSTR,PRCRLF,SCRFLN,NOUT
 	extrn	SCRNP,SELCON,INPCON,OUTCON,SELMDM,INPMDM,OUTMDM
@@ -260,7 +267,7 @@
 	extrn	SQUOTE,SPSIZ,SPAD,SPADCH,TEMP1,OUTPNT,TEMP3
 	extrn	FLWFLG,CHRCNT,BUFPNT,FMFLG,TEMP2,SOHCHR,FNBUF
 	extrn	IBMFLG,PACKET,DBGFLG,RECPKT,TAKFLG,RCVSOP,PRNFLG
-	extrn	SNDSOP,TACFLG,TIMFLG,SFCB,FCB,FCB2,SRVFLG
+	extrn	SNDSOP,TACFLG,TIMFLG,SFCB,FCB,FCB2,SRVFLG,SRVTXT
 
 	extrn	ERMS15
 
@@ -268,7 +275,7 @@
 
 	cseg
 
-PKTVER:	defb	'KPKT (31) 21-Mar-2021',0	; name, edit number, date
+PKTVER:	defb	'KPKT (32) 28-Mar-2021',0	; name, edit number, date
 
 ; GET command
 ; Here from: KERMIT
@@ -334,15 +341,8 @@ READ12:	xor	a
 	ld	(NUMRTR),hl	; set the number of retries to zero
 	ld	(PKTNUM),a	; set the packet number to zero
 	ld	(NUMTRY),a	; set the number of tries to zero
-READ11:	ld	a,(QUIETD)	; quiet display?
-	and	a
-	jr	nz,READ13	; yes, so don't write...
-	call	SCRNRT		; position cursor
-	ld	hl,0
-	call	NOUT		; write the number of retries
-	call	CLREOL		; erase to end of line
-	call	FLSCON		; ensure immediate output
-READ13:	ld	a,(RDL)		; Get or Receive?
+READ11:	call	OUTRTR		; write the number of retries
+	ld	a,(RDL)		; Get or Receive?
 	or	a
 	jr	nz,READ2	; Get, don't reset state
 	ld	a,'R'
@@ -351,17 +351,9 @@ READ13:	ld	a,(RDL)		; Get or Receive?
 
 ; RECEIVE state table switcher.
 
-READ2:	ld	a,(QUIETD)	; noisy display?
-	and	a
-	jr	nz,READ21	; no, a quiet one
-	ld	a,(REMTXT)	; in Remote command?
+READ2:	ld	a,(REMTXT)	; in Remote command?
 	or	a
-	jr	nz,READ21	; yes, don't write to screen
-	call	SCRNP		; position cursor
-	ld	hl,(NUMPKT)
-	call	NOUT		; write the current packet number
-	call	CLREOL		; erase to end of line
-	call	FLSCON		; ensure immediate output
+	call	z,OUTPKN	; no, write the current packet number
 READ21:	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Receive state?
 	jr	nz,READ22
@@ -464,6 +456,17 @@ INMS13:	defb	BELL,'Interrupted',0
 INMS24:	defb	'Receiving...',0
 AUTMES:	defb	CR,LF,LF,'[Automatically receiving, type ^C to abort]'
 	defb	CR,LF,LF,0
+
+; Output current packet number to the screen
+
+OUTPKN:	ld	a,(QUIETD)	; quiet display?
+	and	a
+	ret	nz		; yes, so don't write...
+	call	SCRNP		; position cursor
+	ld	hl,(NUMPKT)
+	call	NOUT		; write the packet number
+	call	CLREOL		; erase to end of line
+	jp	FLSCON		; ensure immediate output
 
 ; Receive routines
 
@@ -822,6 +825,8 @@ SEND:	ld	a,CMIFI		; parse an input file spec
 	call	COMND		; get the text to end of the line
 	jp	KERMT3		; failure in reading buffer
 	ld	(REMLEN),a	; save length (may be zero)
+	xor	a
+	ld	(SRVTXT),a
 	jr	SEND11		; continue below
 
 ; Enter here from SERVER routine.
@@ -864,15 +869,8 @@ SEND14:	call	INIT		; clear the line and initialize the buffers
 	ld	hl,0
 	ld	(NUMPKT),hl	; set the number of packets to zero
 	ld	(NUMRTR),hl	; set the number of retries to zero
-	ld	a,(QUIETD)	; a quiet display?
-	and	a
-	jr	nz,SEND15	; yup, don't write
-	call	SCRNRT		; position cursor
-	ld	hl,0
-	call	NOUT		; write the number of retries
-	call	CLREOL		; erase to end of line
-	call	FLSCON		; ensure immediate output
-SEND15:	ld	a,'1'		; reset to use single character checksum
+	call	OUTRTR		; write the number of retries
+	ld	a,'1'		; reset to use single character checksum
 	ld	(CURCHK),a	; for startup
 	ld	a,'S'
 	ld	(STATE),a	; set the state to Send Initiate
@@ -880,15 +878,8 @@ SEND15:	ld	a,'1'		; reset to use single character checksum
 
 ; SEND state table switcher
 
-SEND2:	ld	a,(QUIETD)	; a quiet display?
-	and	a
-	jr	nz,SEND21	; yes, so don't write
-	call	SCRNP		; position cursor
-	ld	hl,(NUMPKT)
-	call	NOUT		; write the packet number
-	call	CLREOL		; erase to end of line
-	call	FLSCON		; ensure immediate output
-SEND21:	ld	a,(STATE)	; get the state
+SEND2:	call	OUTPKN		; write the packet number
+	ld	a,(STATE)	; get the state
 	cp	'D'		; are we in the Data Send state?
 	jr	nz,SEND3
 	call	SDATA
@@ -984,7 +975,7 @@ SINIT2:	inc	a		; increment it
 	ld	(NUMTRY),a	; reset the number of tries
 	ld	a,(STATE)	; see if S or I state
 	cp	'I'		; I state, so set X as next state
-	jp	nz,SINITA
+	jr	nz,SINITA
 SINITB:	ld	a,'X'
 	ld	(STATE),a
 	ret
@@ -993,6 +984,9 @@ SINITA:	ld	a,(INICHK)	; get the agreed upon block check type
 	ld	(CURCHK),a	; store as type to use for packets now
 	ld	a,'F'		; set the state to File Send (assumed)
 	ld	(STATE),a
+	ld	a,(SRVTXT)
+	or	a		; called from a Server command?
+	ret	nz		; yes, return
 	call	GETFIL		; open the file
 	ret			; assume success; MFNAME thinks the file exists
 
@@ -1151,7 +1145,7 @@ SDAT11:	ld	a,(hl)		; get char
 	ld	a,(PARITY)	; get parity
 	cp	PARNON		; none?
 	ld	a,c		; restore character
-	jp	z,SDAT4		; no parity, leave char alone
+	jr	z,SDAT4		; no parity, leave char alone
 	ld	a,(WRN8)	; look at warning flag
 	or	a		; have we already given the warning?
 	jr	nz,SDAT5	; yes, skip this
@@ -1193,7 +1187,7 @@ SDAT4:	ld	(de),a		; put the char in the data packet
 	cp	'Z'		; want to abort entire stream?
 	jr	nz,SDAT14	; if not, check for just this file
 	ld	(CZSEEN),a	; yes, remember it
-	jp	SDAT16		;  and set EOF state
+	jr	SDAT16		;  and set EOF state
 SDAT14:	cp	'X'		; desire abort of current file?
 	jr	nz,SDAT15	; no, just continue
 	ld	(CZSEEN),a	; yes, remember that
@@ -1205,7 +1199,14 @@ SDAT16:	ld	a,'Z'		; change state to EOF
 	ld	(STATE),a
 	ret			; and return
 
-SDAT12:	call	GTCHR
+SDAT12:	ld	a,(SRVTXT)	; doing a Server Send Data command?
+	or	a
+	jr	z,SDAT17	; no
+	xor	a
+	ld	(SRVTXT),a	; else tell server command succeeded (no retry)
+	ret
+
+SDAT17:	call	GTCHR
 	jp	SDAT13		; error, go see if it is EOF
 	ld	(SIZE),a	; save the size of the data gotten
 	ret	
@@ -1270,7 +1271,14 @@ SEOF12:	call	COUNTP		; increment packet number modulo 64
 	ld	(OLDTRY),a	; save it
 	xor	a
 	ld	(NUMTRY),a	; reset the number of tries
-	call	CLOSEF		; close the file
+	ld	a,(SRVTXT)	; doing a Server EOF command?
+	or	a
+	jr	z,SEOF15	; no
+	xor	a
+	ld	(SRVTXT),a	; else tell server command succeeded (no retry)
+	ret
+
+SEOF15:	call	CLOSEF		; close the file
 
 	;* Check if successful
 
@@ -1866,9 +1874,7 @@ ERMS11:	defb	'?Disk full',0
 ; Fill a data packet from file
 ; Called by: SFILE, SDATA
 
-GTCHR:	ld	a,(SQUOTE)	; get the quote char
-	ld	c,a		; keep quote char in C
-	ld	a,(CURCHK)	; get current block check type
+GTCHR:	ld	a,(CURCHK)	; get current block check type
 	sub	'1'		; get the extra overhead
 	ld	b,a		; get a copy
 	ld	a,(SPSIZ)	; get the maximum packet size
@@ -1879,13 +1885,12 @@ GTCHR:	ld	a,(SQUOTE)	; get the quote char
 	ld	(CBFPTR),hl	; remember where we are
 	ld	b,0		; no chars
 GTCHR1:	ld	a,(TEMP1)
-	dec	a		; decrement the number of chars left
-	jp	p,GTCHR2	; go on if there is more than one left
+	or	a		; check the number of chars left
+	jr	nz,GTCHR2	; go on if there is space left
 	ld	a,b		; return the count in A
 	jp	RSKP
 
-GTCHR2:	ld	(TEMP1),a
-	ld	hl,(CHRCNT)	; any characters left in the big buffer?
+GTCHR2:	ld	hl,(CHRCNT)	; any characters left in the big buffer?
 	ld	a,h
 	or	l
 	jr	nz,GTCHR4	; yes, go fetch character
@@ -1905,62 +1910,17 @@ GTCHR4:	ld	hl,(BUFPNT)	; position in big buffer
 	ld	hl,(CHRCNT)
 	dec	hl		; decrement character count
 	ld	(CHRCNT),hl
-	ld	d,a		; save the char
-	and	80h		; turn off all but parity
-	ld	e,a		; save the parity bit
-	jp	z,GTCH4A	; no parity, skip this check...
-	ld	a,(QUOT8)	; doing eighth-bit quoting?
-	or	a
-	jp	z,GTCH4A	; no, just proceed normally
-	ld	a,(TEMP1)	; get space remaining
-	cp	2		; 3 chrs left (one counted already)?
-	jp	m,GTCHR9	; no, skip this
-	dec	a		; decrement space remaining
-	ld	(TEMP1),a	; put back
-	ld	hl,(CBFPTR)	; position in character buffer
-	ld	a,(QBCHR)	; get quote character
-	ld	(hl),a		; put the quote char in the buffer
-	inc	hl		; increment destination buffer pointer
-	ld	(CBFPTR),hl	; store the pointer back
-	inc	b		; increment the char count
-	ld	e,0		; no parity bit to OR in
-GTCH4A:	ld	a,d		; restore the char
-	and	7Fh		; turn off the parity
-	ld	d,a		; save here for later...
-	cp	SPACE		; compare to a space
-	jp	m,GTCHR5	; if less then its a control char, handle it
-	cp	DEL		; is the char a Delete?
-	jp	z,GTCHR5	; go quote it
-	ld	a,(QUOT8)	; are we doing 8th-bit quoting?
-	or	a
-	jp	z,GTCH4C	; if not, skip this test and restore character
-	ld	a,(QBCHR)	; get 8th-bit quote character
-	cp	d		; same as current character?
-	jp	z,GTCH4B	; yes, have to quote it...
-GTCH4C:	ld	a,d		; no, get character back again
-	cp	c		; is it the quote char?
-	jp	nz,GTCHR8	; if not, proceed
-GTCH4B:	ld	hl,TEMP1	; point to char count
-	dec	(hl)		; decrement (know room for at least one)
-	ld	hl,(CBFPTR)	; position in character buffer
-	ld	(hl),c		; put the (quote) char in the buffer
-	inc	hl
-	ld	(CBFPTR),hl
-	inc	b		; increment the char count
-	ld	a,d		; restore character again
-	jp	GTCHR8
 
-GTCHR5:	; ignore parity for checking
-;       or	e		; turn on the parity bit
+	;TODO: remove this check for RSX180/280?
 
-;*TODO: remove this check for RSX180/280?
 	cp	CTRLZ		; is it a ^Z?
-	jp	nz,GTCHR7	; if not just proceed
+	jr	nz,GTCHR5	; if not just proceed
+
 	ld	a,(FMFLG)	; was the file created by CP/M...
 	cp	1		;  in ASCII-mode?
-	jp	z,GTCH52	; Control-Z stops text
+	jr	z,GTCH42	; Control-Z stops text
 	cp	2		;  in BINARY mode?
-	jp	z,GTCHR6	; yes, pass the ^Z
+	jr	z,GTCH44	; yes, pass the ^Z
 
 	; At this point file-mode is DEFAULT.
 	; If the rest of the record is filled with ^Zs, we're at EOF,
@@ -1969,46 +1929,29 @@ GTCHR5:	; ignore parity for checking
 	ld	hl,(BUFPNT)	; since CHRCNT is ZERO at EOF-time
 	ld	de,(CHRCNT)	; (set by INBUF5 B.G.E)
 				; get the number of chars left in the big buffer
-GTCH51:	ld	a,d
+GTCH41:	ld	a,d
 	or	e
 	dec	de
-	jp	nz,GTCH53	; any chars left?
-
-GTCH52:	ld	hl,0		; if not, get a zero
+	jr	nz,GTCH43	; any chars left?
+GTCH42:	ld	hl,0		; if not, get a zero
 	ld	(CHRCNT),hl	; say no more chars in buffer
 	ld	a,b		; return the count in A
 	jp	RSKP
 
-GTCH53:	; Scan rest of buffer for non ^Z -- If we find a non ^Z, fall into
-	; GTCHR66. If we get to the end of the buffer before finding a non
-	; ^Z, fall into GTCH52.
+GTCH43:	; Scan rest of buffer for non ^Z -- If we find a non ^Z, fall into
+	; GTCH44. If we get to the end of the buffer before finding a non
+	; ^Z, fall into GTCH42.
 
 	ld	a,(hl)		; get the next char
 	inc	hl		; move the pointer
 	cp	CTRLZ		; is it a ^Z?
-	jp	z,GTCH51	; if so, see if the rest are
+	jr	z,GTCH41	; if so, see if the rest are
+GTCH44:	ld	a,CTRLZ		; restore the ^Z
 
-GTCHR6:	ld	a,CTRLZ		; restore the ^Z
-GTCHR7:	ld	(TEMP2),a	; save the char
-	ld	hl,TEMP1	; point to the char total remaining
-	dec	(hl)		; decrement it
-	ld	hl,(CBFPTR)	; position in character buffer
-	ld	(hl),c		; put the quote in the buffer
-	inc	hl
-	ld	(CBFPTR),hl
-	inc	b		; increment the char count
-	ld	a,(TEMP2)	; get the control char back
-	add	a,40h		; make the non-control
-	and	7Fh		;  modulo 128
-GTCHR8:	ld	hl,(CBFPTR)	; position in character buffer
-	or	e		; OR in the parity bit
-	ld	(hl),a		; put the char in the buffer
-	inc	hl
-	ld	(CBFPTR),hl
-	inc	b		; increment the char count
-	jp	GTCHR1		; go around again
+GTCHR5:	call	ENCODE		; encode character and store in packet buffer
+	jp	nc,GTCHR1	; success, go around again
 
-GTCHR9:	; not enough room left in buffer...
+	; not enough room left in buffer...
 
 	ld	hl,(BUFPNT)
 	dec	hl
@@ -2021,6 +1964,68 @@ GTCHR9:	; not enough room left in buffer...
 
 GTCEOF:	ld	a,-1		; get a minus one
 	ret	
+
+; Encode single character and save it in packet buffer.
+; Returns with carry flag set if buffer is full.
+; Updates character count in B.
+
+ENCODE:	ld	hl,(CBFPTR)	; load ponter to character buffer
+	ld	ix,TEMP1	; IX points to space remaining
+	ld	d,a		; save the char
+	ld	a,(ix)		; get space remaining
+	cp	3		; 3 chars left?
+	ret	c		; no, return with carry flag set
+	ld	a,d		; get the char
+	and	80h		; turn off all but parity
+	ld	e,a		; save the parity bit
+	ld	a,(SQUOTE)	; get the quote char
+	ld	c,a		; keep quote char in C
+	jr	z,ENCOD1	; no parity, skip this check...
+	ld	a,(QUOT8)	; doing eighth-bit quoting?
+	or	a
+	jr	z,ENCOD1	; no, just proceed normally
+	dec	(ix)		; decrement space remaining
+	ld	a,(QBCHR)	; get 8th-bit quote character
+	ld	(hl),a		; put the quote char in the buffer
+	inc	hl		; increment destination buffer pointer
+	inc	b		; increment the char count
+	ld	e,0		; no parity bit to OR in
+ENCOD1:	ld	a,d		; restore the char
+	and	7Fh		; turn off the parity
+	ld	d,a		; save here for later...
+	cp	SPACE		; compare to a space
+	jr	c,ENCOD4	; if less then its a control char, handle it
+	cp	DEL		; is the char a Delete?
+	jr	z,ENCOD4	; go quote it
+	ld	a,(QUOT8)	; are we doing 8th-bit quoting?
+	or	a
+	jr	z,ENCOD2	; if not, skip this test and restore character
+	ld	a,(QBCHR)	; get 8th-bit quote character
+	cp	d		; same as current character?
+	jr	z,ENCOD3	; yes, have to quote it...
+ENCOD2:	ld	a,d		; no, get character back again
+	cp	c		; is it the quote char?
+	jr	nz,ENCOD5	; if not, proceed
+ENCOD3:	dec	(ix)		; decr char count (know room for at least one)
+	ld	(hl),c		; put the (quote) char in the buffer
+	inc	hl		; advance destination buffer pointer
+	inc	b		; increment the char count
+	ld	a,d		; restore character again
+ENCOD5:	dec	(ix)		; decrement char total remaining
+	or	e		; OR in the parity bit, clear carry flag
+	ld	(hl),a		; put the char in the buffer
+	inc	hl		; advance destination buffer pointer
+	inc	b		; increment the char count
+	ld	(CBFPTR),hl	; store destination buffer pointer
+	ret			; return with carry flag clear
+
+ENCOD4:	dec	(ix)		; decrement space remaining
+	ld	(hl),c		; put the quote in the buffer
+	inc	hl		; advance destination buffer pointer
+	inc	b		; increment the char count
+	add	a,40h		; make the char non-control
+	and	7Fh		;  modulo 128
+	jr	ENCOD5		; put the char in the buffer and return
 
 ; Get the file name (including host to micro translation) and create the file.
 ; Called by: RFILE
@@ -2320,6 +2325,7 @@ SPACK8:	ld	a,(SEOL)	; get the EOL the other host wants
 	inc	hl		; point to next char
 	xor	a		; get a null
 	ld	(hl),a		; put in the packet
+	;...
 
 ; Write out the packet.
 
@@ -2555,14 +2561,14 @@ INPKT1:	call	INCHR		; get first character
 	jp	R		; return failure
 	ld	hl,RCVSOP	; is it receive start-of-pkt char?
 	cp	(hl)
-	jp	nz,INPKT1	; if not, ignore leading junk
-	jp	INPKT3		; else go put it in packet
+	jr	nz,INPKT1	; if not, ignore leading junk
+	jr	INPKT3		; else go put it in packet
 
 INPKT2:	call	INCHR		; get a character
 	jp	R		; return failure
 	ld	hl,RCVSOP	; is it receive start-of-pkt char?
 	cp	(hl)
-	jp	nz,INPKT3	; if not, continue
+	jr	nz,INPKT3	; if not, continue
 	ld	hl,RECPKT	; else throw away what we've got so far
 	ld	(PKTPTR),hl
 INPKT3:	ld	hl,(PKTPTR)
@@ -2573,7 +2579,7 @@ INPKT3:	ld	hl,(PKTPTR)
 	ld	de,RECPKX	; start over if packet buffer overflow
 	or	a
 	sbc	hl,de
-	jp	nc,INPKT	; buffer overflow
+	jr	nc,INPKT	; buffer overflow
 	ld	a,(REOL)	; get the EOL char
 	cp	b
 	jr	nz,INPKT2	; if not loop for another
@@ -2584,7 +2590,7 @@ INPKT3:	ld	hl,(PKTPTR)
 	ld	hl,RECPKT+3	; point to packet type
 	ld	a,(PACKET+3)	; get the one we sent
 	cp	(hl)		; are they the same?
-	jp	z,INPKT		; yes, get another packet
+	jr	z,INPKT		; yes, get another packet
 
 	;[gnn]  *** end of patch *****
 
@@ -2598,7 +2604,7 @@ INPKT3:	ld	hl,(PKTPTR)
 	jr	z,INPKT6	; if not, then proceed
 	ld	a,(STATE)	; check if this is the Send-Init packet
 	cp	'S'
-	jp	z,INPKT6	; if so don't wait for the XON
+	jr	z,INPKT6	; if so don't wait for the XON
 INPKT5:	call	INCHR		; wait for the turn-around char
 	jp	INPKT6
 	cp	XON		; is it the IBM turn-around character?
@@ -2714,7 +2720,7 @@ INCHR4:	pop	bc		; restore registers
 
 INCHR6:	ld	a,(TIMFLG)	; pick up timer flag
 	or	a		; are we allowed to use timer?
-	jp	z,INCHR0	; no, don't time out
+	jr	z,INCHR0	; no, don't time out
 	ld	hl,(TIMVAL)	; decrement time-out
 	dec	hl		;
 	ld	(TIMVAL),hl	; ((TIMOUT-1) * 100ms + loop time)
@@ -2785,7 +2791,7 @@ CRCCL0:	ld	a,(hl)		; get a character
 	ld	d,a		; move back into D
 	pop	hl		; restore pointer
 	inc	hl		; point to next character
-	jp	CRCCL0		; go get next character
+	jr	CRCCL0		; go get next character
 
 CRCCL1:	pop	bc		; restore B
 	pop	hl		;  and HL
@@ -2839,13 +2845,13 @@ CRCTB2:	defw	00000h
 
 ERROR:	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	nz,ERROR0	; so don't say a thing
+	jr	nz,ERROR0	; so don't say a thing
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
 	call	z,SCRERR	; no, position the cursor
 ERROR0:	ld	a,'A'		; set the state to Abort
 	ld	(STATE),a
-	jp	ERROR2
+	jr	ERROR2
 
 ERROR1:	ld	a,(QUIETD)	; a quiet display?
 	and	a
@@ -2859,7 +2865,7 @@ ERROR2:	ld	a,(ARGBLK+1)	; get the length of the data
 	ld	de,DATA		; print error message
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
-	jp	nz,ERRR2A	; yes, print message, quiet or not!
+	jr	nz,ERRR2A	; yes, print message, quiet or not!
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	ret	nz		; so don't say a thing
@@ -2874,7 +2880,7 @@ ERROR3:	ld	a,(QUIETD)	; a quiet display?
 	ret	nz		; so don't say a thing
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
-	jp	nz,ERR3A	; yes, don't position cursor
+	jr	nz,ERR3A	; yes, don't position cursor
 	push	de		; save the pointer to the message
 	call	SCRERR		; position the cursor
 	pop	de		; get the pointer back
@@ -2927,7 +2933,7 @@ UPDRTR:	ld	hl,(NUMRTR)
 	ld	a,(REMTXT)	; doing a Remote server command?
 	or	a
 	ret	nz		; yes, keep mum
-	ld	a,(QUIETD)	; a quiet display?
+OUTRTR:	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	ret	nz		; so don't say a thing
 	call	SCRNRT		; position cursor
@@ -2956,7 +2962,7 @@ INMS25:	defb	BELL,'Warning: eighth bit cannot be sent',0
 
 FINMES:	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	z,FINME0	; so do usual stuff
+	jr	z,FINME0	; so do usual stuff
 	push	de		; save pointer to completion message
 	call	PRCRLF		; best do a new line
 	pop	de		; restore completion message pointer
@@ -3034,7 +3040,7 @@ PRINTM:	ld	a,(hl)		; get character from string
 	call	OUTPRN		; output character to printer
 	pop	hl		; restore string address
 	inc	hl		; point past printed character
-	jp	PRINTM		; go output rest of string
+	jr	PRINTM		; go output rest of string
 
 ; Test if character in A is the start of header character.  We get
 ; the start of packet character from SOHCHR, which can be SET

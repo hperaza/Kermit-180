@@ -124,7 +124,7 @@
 	public	OLDTRY,RTIME,WRN8,DSCFLG,QUOT8,FILBUF,RPADCH,RQUOTE
 	public	SQUOTE,PACKET,SPADCH,SOHCHR,HOSTHS,HOSTNM,QBCHR
 	public	OUTPNT,RECPKT,RECPKX,TAKCNT,RPRMPT,CMDPTR,STARC
-	public	REXBUF,REXBFL,REXCNT,SRVFLG
+	public	REXBUF,REXBFL,REXCNT,SRVFLG,SRVTXT,OPROC
 
 	extrn	TTAB,SPDTBL,SPHTBL
 
@@ -210,6 +210,8 @@ ERRORC:	defb	0	; error level set to xxx [set, but not used???]
 ERRORL:	defb	0	; error level to test against [not used???]
 
 REMTXT:	defb	0	; set <> 0 if D packets to screen
+SRVTXT:	defb	0	; set <> 0 if D packets from server command
+OPROC:	defs	2	; output routine address for DIR command, etc.
 
 HOSTHS:	defs	1	; have we told the host to xoff? (is this duplicated)
 STBUFF:	defs	128	; some space or the string buffer
