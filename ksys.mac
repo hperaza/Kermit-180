@@ -1058,8 +1058,10 @@ CHD2:	ld	a,(FCB+F.ATTR)
 	jr	nz,CHD3		; yes
 	ld	a,c
 	and	FN.NAME		; else try filename
+ IF 0
 	ld	a,E.BADOP
 	scf
+ ENDIF
 	ret	z		; nope
 	ld	hl,FCB+F.NAME
 CHD3:	;*TODO: ensure directory exists on CURDEV?

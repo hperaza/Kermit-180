@@ -223,3 +223,14 @@ Using Kermit-80 4.11 as the base version.
 - Implemented the Server CD and SPACE commands.
 
 
+30/03/21
+
+- Decode packet data before attempting to decode Server Generic command,
+  as RPACK returns the raw packet data and some characters may be still
+  "quoted".
+
+- Allow changing default device in Server CD command.
+
+- Server CD command response is now more verbose, showing default device
+  and directory.
+

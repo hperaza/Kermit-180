@@ -56,10 +56,12 @@
 	extrn	SINIT,SEOT,OUTPKN,OUTCHR,OUTSTR,COMPP,COUNTP,DIR2
 	extrn	OUTRTR,UPDRTR,ERROR,DEVSTR,DIRSTR,STRLEN,STRCPY
 	extrn	SETFCB,CHDIR,CPYNAM,MFINIT,MFEND,CVTLD,DSKFRE
+	extrn	ERMS32
 
 	extrn	SRVFLG,ARGBLK,DATA,NUMPKT,PKTNUM,NUMRTR,NUMTRY,CURCHK
 	extrn	SFCB,QUIETD,SPSIZ,FILBUF,CBFPTR,SIZE,TEMP1,TEMP2,STATE
-	extrn	SRVTXT,OPROC,FCB,CURDIR,FREBKS
+	extrn	SRVTXT,OPROC,FCB,CURDEV,CURDIR,CDMSG,FREBKS,RQUOTE
+	extrn	QUOT8,QBCHR
 
 	extrn	PFN
 
@@ -102,6 +104,7 @@ SERV1:	cp	'S'		; Send-Initiate packet?
 
 SERV2:	cp	'R'		; Receive-Initiate packet?
 	jr	nz,SERV3	; no
+	call	DECODE		; decode packet data
 	ld	hl,DATA		; get a pointer to the data
 	ld	ix,SFCB		; place result in source FCB
 	call	PFN		; parse filename
@@ -121,7 +124,8 @@ SERV4:	cp	'C'		; Host command?
 
 SERV5:	cp	'G'		; Generic command?
 	jp	nz,SERV6	; no
-	ld	a,(ARGBLK+1)	; get length
+	call	DECODE		; decode packet data
+	ld	a,(TEMP2)	; get length of decoded data
 	ld	c,a		; keep a copy in register C
 	or	a		; any command?
 	jp	z,SERV7		; no, error
@@ -154,11 +158,16 @@ SERV51:	cp	'C'		; Change directory?
 	and	F.DIR OR F.NAME
 	jr	z,S511
 	call	CHDIR		; set current dir
-;;	jp	c,...
-S511:	ld	hl,FILBUF
+	ld	de,ERMS32
+	jp	c,SERV71
+S511:	ld	hl,CDMSG
+	ld	de,FILBUF
+	call	STRCPY
+	ex	de,hl
+	ld	de,CURDEV
+	call	DEVSTR
 	ld	de,CURDIR
-	call	CPYNAM
-	ld	(hl),0
+	call	DIRSTR
 	call	ACKL		; send long ACK
 	jp	SERVER
 
@@ -176,7 +185,12 @@ SERV52:	cp	'D'		; Directory?
 	call	DIRSTR		; copy directory name
 	call	SNDINI		; send S packet, set output to SNDCHR
 	call	DIR2		; do the directory command
+ IF 0
 	jp	c,KERMIT
+ ELSE
+	ld	de,ERMS32
+	jp	c,SERV71
+ ENDIF
 	call	SNDEOF		; end transmission
 	jp	SERVER		; and restart the server
 
@@ -188,9 +202,11 @@ SERV53:	cp	'U'		; Disk Usage?
 	call	PFN		; parse directory name, if present
 	call	SETFCB		; use current dir, if none was specified
 	call	MFINIT
-;;	jp	c,...
+	ld	de,ERMS32
+	jp	c,SERV71
 	call	DSKFRE
-;;	jp	c,...
+	ld	de,ERMS32
+	jp	c,SERV71
 	call	MFEND
 	ld	hl,FILBUF
 	ld	de,SFCB+F.DEV
@@ -248,7 +264,7 @@ SERV6:	cp	'N'		; NAK?
 	jp	z,SERVER	; yes, ignore
 
 SERV7:	ld	de,ERMS1
-	push	de
+SERV71:	push	de
 	call	ERROR3		; display error message
 	pop	de
 	inc	de		; skip question mark
@@ -256,6 +272,66 @@ SERV7:	ld	de,ERMS1
 	jp	SERVER		; restart server
 
 ERMS1:	defb	'?Invalid command',0
+
+; Decode packet data. This routine is sort of duplicated in KPKT.MAC,
+; but not easily reusable.
+
+DECODE:	ld	hl,DATA		; beginning of received packet data
+	ld	ix,DATA		; replace packet with decoded data
+	ld	a,(ARGBLK+1)	; get length
+	ld	(TEMP1),a
+	xor	a
+	ld	(TEMP2),a
+	ld	a,(RQUOTE)
+	ld	b,a		; keep the quote char in B
+	ld	c,0		; assume no 8-bit quote char
+	ld	a,(QUOT8)	; doing 8-bit quoting?
+	or	a
+	jr	z,PTCHR1	; no, keep going
+	ld	a,(QBCHR)	; else get 8-bit quote char
+	ld	c,a		; keep this in C
+PTCHR1:	ld	a,(TEMP1)
+	dec	a		; decrement # of chars in packet
+	ret	m		; return successfully if done
+	ld	(TEMP1),a
+	ld	a,(hl)		; grab a char
+	inc	hl		; and bump pointer
+	ld	e,0		; assume nothing to OR in
+	cp	c		; is it the binary quote char?
+	jr	nz,PTCH2A	; no, keep going
+	ld	e,80h		; include parity bit
+	ld	a,(TEMP1)
+	dec	a
+	ld	(TEMP1),a	; decrement character count
+	ld	a,(hl)		; get next character
+	inc	hl		; and bump pointer
+PTCH2A:	cp	b		; is it the quote char?
+	jr	nz,PTCHR3	; changed to PTCHR3 so includes parity
+	ld	a,(TEMP1)
+	dec	a		; decrement # of chars in packet
+	ld	(TEMP1),a
+	ld	a,(hl)		; get the quoted character
+	inc	hl
+	ld	d,a		; save the char
+	and	80h		; turn off all but the parity bit
+	or	e		; let parity come from either (???)
+	ld	e,a		; save the parity bit
+	ld	a,d		; get the char
+	and	7Fh		; turn off the parity bit
+	cp	b		; is it the quote char?
+	jr	z,PTCHR3	; if so, just go write it out
+	cp	c		; maybe it's the 8-bit prefix character?
+	jr	z,PTCHR3	; then don't controllify
+	ld	a,d		; get the char
+	add	a,40h		; make the character a control char again
+	and	7Fh		;  modulo 128
+PTCHR3:	or	e		; OR in the parity bit
+	ld	(ix),a		; store it in destination buffer
+	inc	ix		; update the pointer
+	ld	a,(TEMP2)
+	inc	a
+	ld	(TEMP2),a	; increase character count
+	jp	PTCHR1		; and loop to next char
 
 ; Get command argument. On entry, HL still points to command char and
 ; C contains the command length. The result is placed in FILBUF.
@@ -282,7 +358,7 @@ GET2:	xor	a
 	ld	(de),a		; end with a null
 	ret
 
-; Set long ACK with the string specified in FILBUF.
+; Send long ACK with the string specified in FILBUF.
 
 ACKL:	ld	a,(PKTNUM)
 	ld	(ARGBLK),a	; set packet number

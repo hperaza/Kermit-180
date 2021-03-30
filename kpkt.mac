@@ -1746,13 +1746,13 @@ SPAR1:	ld	a,(TEMP4)	; determine if block check type given
 PTCHR:	ld	(TEMP1),a	; save the size
 	ld	a,(REMTXT)	; get remote command flag
 	or	a		; Remote command in progress?
-	jp	nz,PTCHR0	; yes, don't check for file collisions
+	jr	nz,PTCHR0	; yes, don't check for file collisions
 	ld	a,(FLWFLG)	; get File Warning (Set Collision) flag
 	cp	2		; SET COLLISION DISCARD?
-	jp	nz,PTCHR0	; no
+	jr	nz,PTCHR0	; no
 	ld	a,(DSCFLG)	; yes, get "discard" flag
 	or	a		; discarding file?
-	jp	z,PTCHR0	; no
+	jr	z,PTCHR0	; no
 	ld	a,'X'		; yes, simulate a user rejection
 	ld	(CZSEEN),a
 	jp	RSKP		; and pretend success
@@ -1764,7 +1764,7 @@ PTCHR0:	ld	hl,DATA		; beginning of received packet data
 	ld	c,0		; assume no 8-bit quote char
 	ld	a,(QUOT8)	; doing 8-bit quoting?
 	or	a
-	jp	z,PTCHR1	; no, keep going
+	jr	z,PTCHR1	; no, keep going
 	ld	a,(QBCHR)	; else get 8-bit quote char
 	ld	c,a		; keep this in C
 PTCHR1:	ld	hl,TEMP1
@@ -1772,7 +1772,7 @@ PTCHR1:	ld	hl,TEMP1
 	jp	m,RSKP		; return successfully if done
 	ld	a,(REMTXT)	; to screen only?
 	and	a
-	jp	nz,PTCHR2	; don't do any disk stuff
+	jr	nz,PTCHR2	; don't do any disk stuff
 
 	ld	hl,(BUFLEN)	; big buffer size in bytes
 	ld	de,(CHRCNT)	; number of chars in big buffer
@@ -1783,20 +1783,19 @@ PTCHR1:	ld	hl,TEMP1
 
 PTCHR2:	ld	hl,(OUTPNT)	; get position in output buffer
 	ld	a,(hl)		; grab a char
-	inc	hl
-	ld	(OUTPNT),hl	; and bump pointer
+	inc	hl		; and bump pointer
 	ld	e,0		; assume nothing to OR in
 	cp	c		; is it the binary quote char?
-	jp	nz,PTCH2A	; no, keep going
+	jr	nz,PTCH2A	; no, keep going
 	ld	e,80h		; include parity bit
 	ld	a,(TEMP1)
 	dec	a
 	ld	(TEMP1),a	; decrement character count
 	ld	a,(hl)		; get next character
-	inc	hl
-	ld	(OUTPNT),hl
-PTCH2A:	cp	b		; is it the quote char?
-	jp	nz,PTCHR3	; changed to PTCHR3 so includes parity
+	inc	hl		; bump pointer
+PTCH2A:	ld	(OUTPNT),hl
+	cp	b		; is it the quote char?
+	jr	nz,PTCHR3	; changed to PTCHR3 so includes parity
 	ld	a,(hl)		; get the quoted character
 	inc	hl
 	ld	(OUTPNT),hl	; and bump pointer
@@ -1809,26 +1808,24 @@ PTCH2A:	cp	b		; is it the quote char?
 	ld	a,d		; get the char
 	and	7Fh		; turn off the parity bit
 	cp	b		; is it the quote char?
-	jp	z,PTCHR3	; if so, just go write it out
+	jr	z,PTCHR3	; if so, just go write it out
 	cp	c		; maybe it's the 8-bit prefix character?
-	jp	z,PTCHR3	; then don't controllify
+	jr	z,PTCHR3	; then don't controllify
 	ld	a,d		; get the char
 	add	a,40h		; make the character a control char again
 	and	7Fh		;  modulo 128
 PTCHR3:	or	e		; OR in the parity bit
-	ld	(TEMP3),a	; save for a while
+	ld	l,a		; save for a while
 	ld	a,(REMTXT)	; to screen or disk?
 	and	a
-	ld	a,(TEMP3)
-	jp	z,PTCH31	; to disk
-	push	hl
+	ld	a,l		; restore char
+	jr	z,PTCH31	; to disk
 	push	de
 	push	bc
 	ld	e,a		; to display
 	call	OUTCON
 	pop	bc
 	pop	de
-	pop	hl
 	jp	PTCHR1		; continue
 
 PTCH31:	ld	hl,(BUFPNT)	; destination buffer

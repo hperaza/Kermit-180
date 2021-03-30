@@ -127,7 +127,8 @@
 	include	DCB.INC
 
 	public	COMVER,SETCOM,SHOVER,SHOW,STRING,STATUS,NOEXIT
-	public	CHKKEY,BLKTAB,BLKHLP,STAT01,SETCWD,NOTIMP
+	public	CHKKEY,BLKTAB,BLKHLP,STAT01,SETCWD,NOTIMP,CDMSG
+	public	ERMS32
 
 	extrn	KEYCMD,COMND,KERMIT,PRTSTR,SELCON,OUTCON,ESCPR
 	extrn	SETPAR,CFMCMD,NOUT,PRCRLF,SYSSPD,SYSPRT,CLRTOP
@@ -1403,7 +1404,8 @@ STACWD:	ld	de,CURDST	; display header string
 	pop	de
 	jp	PRTSTR		; output current device and directory
 
-CURDST:	db	CR,LF,'Current device and directory is ',0
+CURDST:	db	CR,LF
+CDMSG:	db	'Current device and directory is ',0
 
 ; Display current state of a boolean flag.
 ; Called with A/ value (zero = OFF, non-zero = ON)
