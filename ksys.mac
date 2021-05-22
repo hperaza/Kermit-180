@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 19, 22-May-2021 by H. Peraza: when selecting a new line, update the
+;       SPEED variable with the value obtained from device characteristics.
+;
 ; edit 18, 28-Mar-2021 by H. Peraza: the DIR routine now uses OUTCHR and
 ;       OUTSTR for thext output. In server mode, the routines capture the
 ;       output of DIR and sends it as a series of D-packets to the remote
@@ -132,7 +135,7 @@
 
 	.Z80
 
-	ident	/18/
+	ident	/19/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -165,7 +168,7 @@
 	extrn	VERSION,BANNER,RSXVER,CURDEV,CURDIR,$MEMRY,BUFADR
 	extrn	BUFSEC,BUFLEN,BUFPNT,MAXBSC,DBGFLG,HOSTNM,PORT
 	extrn	TEMP1,NUMBER,CHRCNT,TAKFLG,TAKBUF,TAKFCB,FNBUF
-	extrn	FCBS2,SRVFLG
+	extrn	FCBS2,SRVFLG,SPEED
 
 	extrn	ATTACH,DETACH,PUTCH,PUTSTR,TTLUN,TTFLSH,UCASE
 	extrn	CPHLDE,CVTBD,CVTLD,BCD2BIN,CVTBH
@@ -186,7 +189,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (18) 28-Mar-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (19) 22-May-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -666,6 +669,9 @@ SYSP1:	ld	de,(PORT)	; get name of new comm line
 	SC	.QIO		; remember original settings
 	;jr	c,...		; don't return on error, but try instead
 				;  to set characteristics that make sense?
+	ld	a,(OLDSPD+1)
+	ld	(SPEED),a	; update serial speed variable
+
 	ld	hl,MDMSTC
 	SC	.QIO		; slave terminal, disable echo
 	ret	
@@ -2705,7 +2711,7 @@ TTQ:	defs	1		; TQ.IP
 
 MDMSET:	defs	1		; non-zero if comm line is attached
 
-MDMGTC:	QIOW$	SF.GMC,LUNMDM,EFNMD,IOSB,,<MDORIG,8>	; get original settings
+MDMGTC:	QIOW$	SF.GMC,LUNMDM,EFNMD,IOSB,,<MDORIG,10>	; get original settings
 MDMSTC:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDCOMM,8>	; set comm characteristics
 MDMRST:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDORIG,8>	; restore original config
 MDMSPD:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDSPD,2>	; set line speed
@@ -2716,6 +2722,7 @@ MDORIG:	defb	TC.BIN,0	; orig. binary mode
 	defb	TC.NEC,0	; orig. echo mode
 	defb	TC.SLV,0	; orig. slave status
 	defb	TC.NBR,0	; orig. broadcast mode
+OLDSPD:	defb	TC.SPD,S.0	; orig. serial speed
 MDCOMM:	defb	TC.BIN,1	; set binary mode
 	defb	TC.NEC,1	; no echo
 	defb	TC.SLV,1	; slave

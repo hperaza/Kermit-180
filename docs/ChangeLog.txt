@@ -234,3 +234,10 @@ Using Kermit-80 4.11 as the base version.
 - Server CD command response is now more verbose, showing default device
   and directory.
 
+
+22/05/21
+
+- Initialize the SPEED variable with the TC.SPD value obtained from the
+  device characteristics.
+
+
