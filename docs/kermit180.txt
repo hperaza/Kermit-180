@@ -3,7 +3,7 @@
 
 1. RSX180/280 Kermit
 
-Program:    Hector Peraza
+Program:    Hector Peraza, see also Credits
 Language:   Z80 Assembler, ZSM4
 OS:         RSX180 and RSX280
 Version:    4.12
@@ -12,7 +12,7 @@ Date:       Jan 8, 2021
 
 Kermit-180 Capabilities At A Glance:
   Local operation:                   Yes
-  Remote operation:                  Partial, Auto-receive only
+  Remote operation:                  Yes
   Login scripts:                     Yes, limited
   Transfer text files:               Yes
   Transfer binary files:             Yes
@@ -32,7 +32,7 @@ Kermit-180 Capabilities At A Glance:
   Debug logging:                     No
   Session logging:                   Yes
   Raw file transmit:                 Yes
-  Act as server:                     No
+  Act as server:                     Yes
   Talk to server:                    Yes
   Advanced commands for servers:     Yes
   Command/init files:                Yes
@@ -47,19 +47,19 @@ Kermit-180 Capabilities At A Glance:
 
 1.1. Credits
 
-Kermit-180 is based on CP/M Kermit which, in turn, is the first of all the
-Kermit programs.  CP/M Kermit was originally written by Bill Catchings of
-Columbia University in 1981.  Over the years, contributions have been added
-by many people, including Charles Carvalho (ACC), Bernie Eiben (DEC), Nick
-Bush (Stevens Institute of Technology), John Bray (University of Tennessee),
-Bruce Tanner (Cerritos College), Greg Small (University of California at
-Berkeley), Kimmo Laaksonen (Helskini University of Technology), Bertil Schou
-(Loughborough University), Jon Warbrick (Plymouth Polytechnic University),
-Brian Robertson (Aberdeen University), A.J.  Cole (Leeds University), John
-Shearwood (Birmingham University), Tony Addyman (Salford University),
-Godfrey Nix and Martin Carter (Nottingham University), Ian Young (Edinburgh
-University), Chris Miles (Manchester University), Richard Russell, Dave
-Roberts, and many, many others.
+Kermit-180 is derivated from on CP/M Kermit which, in turn, is the first of
+all the Kermit programs.  CP/M Kermit was originally written by Bill
+Catchings of Columbia University in 1981.  Over the years, contributions
+have been added by many people, including Charles Carvalho (ACC), Bernie
+Eiben (DEC), Nick Bush (Stevens Institute of Technology), John Bray
+(University of Tennessee), Bruce Tanner (Cerritos College), Greg Small
+(University of California at Berkeley), Kimmo Laaksonen (Helskini University
+of Technology), Bertil Schou (Loughborough University), Jon Warbrick
+(Plymouth Polytechnic University), Brian Robertson (Aberdeen University),
+A.J.  Cole (Leeds University), John Shearwood (Birmingham University), Tony
+Addyman (Salford University), Godfrey Nix and Martin Carter (Nottingham
+University), Ian Young (Edinburgh University), Chris Miles (Manchester
+University), Richard Russell, Dave Roberts, and many, many others.
 
 The latest know CP/M Kermit Version is 4.11, which is the work of Mike
 Freeman of the Bonneville Power Administration in Vancouver, WA, USA, with
@@ -150,6 +150,8 @@ exceptions:
 
    - Precise PAUSE timing using the system timer services.
 
+In addition, Kermit-180 implements Remote and Server modes.
+
 
 2. Overview of Kermit Operation
 
@@ -163,9 +165,9 @@ conduct a session.
 
 To transfer a text file, start the Kermit program on the remote computer and
 tell it to SEND the desired file (if uploading) or to RECEIVE (if
-downloading). "Escape back" to Kermit-180, usually by typing Ctrl-\ (hold
-down the Control key and press the backslash key) and then type the letter
-C.  At the Kermit-180 prompt type RECEIVE (if you gave a SEND command to the
+downloading).  "Escape back" to Kermit-180, usually by typing Ctrl-\ C (hold
+down the Control key and press the backslash key, and then type the letter
+C.) At the Kermit-180 prompt type RECEIVE (if you gave a SEND command to the
 remote Kermit) or SEND filename (if you gave a receive command to the remote
 Kermit).
 
@@ -191,16 +193,21 @@ give a BYE command to terminate your remote session, or a FINISH command to
 tell the remote Kermit to return to its prompt so you can CONNECT back and
 conduct further business.
 
+The opposite is also possible: Kermit-180 may also be put into "server mode"
+and GET and SEND commands issued from the remote Kermit. This simplifies
+operation with remote computers whose Kermit does not implement the SERVER
+command.
+
 That's all there is to it.
 
 
 2.1. Kermit-180 Description
 
-Since Kermit-180 runs on a standalone micro, it is always in control of the
-screen -- it is always in "local mode".  It includes a terminal emulator for
-establishing a connection to a remote computer or service, and during file
-transfer, it keeps the screen updated with the file name and the packet number,
-whether sending or receiving.
+Kermit-180 is able to run in both "remote" and "local" modes.  It includes a
+terminal emulator for establishing a connection to a remote computer or
+service, and during file transfer in "local" mode it keeps the screen
+updated with the file name and the packet number, whether sending or
+receiving.
 
 Kermit-180 is capable of precise timeouts on an input request, and can break
 deadlocks automatically.  If, despite the timeout capability, the transmission
@@ -237,8 +244,24 @@ Carriage Return If you type a carriage return Kermit-180 will resend the current
                 limit (somewhere between 5 and 16 times) for a particular
                 packet.
 
+2.2. Local and Remote Operation
 
-2.2. Kermit-180 Commands
+Kermit-180 by default assumes that all file transfers will occur over the
+terminal line that you are currently logged in on (TI:).  This is known as
+REMOTE mode (the RSX180/280 is the remote system).  This would be the
+desired case if you are running Kermit on a microcomputer such as a PC and
+are currently logged into the RSX180/280 system through the micro.  However,
+if you wanted to dial out, say by an autodial modem, from RSX180/280 to
+another system, you need to tell Kermit-180 to use some other terminal line. 
+This would be called LOCAL mode (the RSX180/280 is the local system).  The
+line can be altered with the SET PORT or SET LINE command (see section on
+SET and CONNECT).
+
+On RSX180/280, privilege is required to alter settings on any other terminal
+line unless the line is set Public via the MCR SET /PUB command.
+
+
+2.3. Kermit-180 Commands
 
 Kermit-180 is an interactive program.  It issues a prompt, you type a command.
 The process repeats until you give the EXIT command to leave the program.
@@ -492,6 +515,41 @@ SEND filespec
         filespec may contain RSX180/280 wildcards.  SEND may be abbreviated
         to the single letter S.
 
+SERVER
+        Puts  a  remote  Kermit-180  in  "server mode", so that it receives
+        all further commands in packets from the local Kermit. The Kermit-180
+        server is capable (as of this writing) of executing the remote server
+        commands listed below. Any nonstandard parameters should be selected
+        with SET commands before putting Kermit-180 into server mode, in
+        particular the file type.
+
+        SEND filespec
+                Send file(s) specified by filespec to the remote Kermit-180
+                server.
+
+        GET filespec [local_filespec]
+                Requests the remote Kermit-180 server to send files to the
+                Local machine.
+
+        FINISH
+                Tells the remote Kermit server to exit without logging out
+                of the remote system.  You can then CONNECT back to the
+                remote Kermit program.
+
+        REMOTE DIRECTORY [filespec]
+                The names of the files that match the given file specification
+                will be displayed on your screen, perhaps along with size and
+                date information for each file.  If no file specification is
+                given, all files from the current directory will be listed.
+
+        REMOTE CWD [directory]
+                Change Working Directory.  If no directory name is provided,
+                the server will change to the default or home directory. 
+                The directory specification may be preceded by a device name.
+
+        REMOTE SPACE
+                Display information about disk usage in the current device.
+
 SET parameter [value]
         Set the specified parameter to the specified value.  Possible
         parameter settings:
@@ -640,7 +698,6 @@ SET parameter [value]
                 This is the same as the SET LINE command, and allows you to
                 switch between different communication ports.  Normally, you
                 can connect to any free terminal device.
-
 
         PRINTER ON (or OFF)
                 Turns copying of CONNECT session to printer on and off.  It is
@@ -808,7 +865,7 @@ Kermit-180 is built in from the following files:
   KPKT.MAC    KERMIT protocol handler (SEND, RECEIVE, LOGOUT, and FINISH
               commands)
   KREM.MAC    REMOTE routines
-  KSER.MAC    SERVER routines (for the future)
+  KSER.MAC    SERVER routines
   KTT.MAC     The transparent commands (TRANSMIT, CONNECT)
   KCMD.MAC    The command parser
   KSYS.MAC    RSX180/280-specific routines and local file handling commands
@@ -817,8 +874,8 @@ Kermit-180 is built in from the following files:
   KDAT.MAC    Global data space
 
 Unlike Kermit-80, there are no customizable system-dependent files since all
-the communication is done via the system device drivers, and RSX180/280 are
-not allowed to access I/O ports directly anyway.
+the communication is done via the system device drivers, and RSX180/280 
+programs are not allowed to access I/O ports directly anyway.
 
 There is a jump entry in the KSYS.MAC file to allow users to add their own
 terminal emulator (a leftover of Kermit-80).  If you write the code for such
@@ -861,7 +918,7 @@ Work that needs to be done in future releases includes:
 
  - Command macros, more advanced login scripts
 
- - Server mode
+ - Implement more Server commands
 
- - etc etc.
+ - etc.
 
