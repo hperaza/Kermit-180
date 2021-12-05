@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 17, 4-Dec-2021 by H. Peraza: display error message if SET PORT could
+;       not attach unit. Also display a message on Local/Remote mode change.
+;
 ; edit 16, 29-Mar-2021 by H. Peraza: CHDIR routine moved to the system-
 ;       dependent module.
 ;
@@ -119,7 +122,7 @@
 
 	.Z80
 
-	ident	/16/
+	ident	/17/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -141,14 +144,14 @@
 	extrn	FLOCTL,HIDEFS,IBMFLG,PARITY,FMFLG,INCFLG,RDCKT
 	extrn	QUIETD,VTFLG,SPDTAB,SPEED,TEMP1,FILEIO,TACCHR
 	extrn	EXTERN,SPDHLP,PORT,FNBUF,LOGFCB,FCB,PAUSIT,BUFLEN
-	extrn	CURDEV,CURDIR
+	extrn	CURDEV,CURDIR,OPMODE
 
 	extrn	MITVER,PKTVER,REMVER,SRVVER,TTVER,SYSVER,CMDVER
 	extrn	UTLVER,DATVER,VERSION
 
 	cseg
 
-COMVER:	defb	'KCOM (16) 29-Mar-2021',0	; name, edit no. and date
+COMVER:	defb	'KCOM (17)  4-Dec-2021',0	; name, edit no. and date
 
 ; This is the SET command.
 
@@ -816,15 +819,39 @@ PRTS1:	ld	a,(FCB+F.ATTR)
 	ld	de,PORT
 	ld	bc,3
 	ldir			; yes, set new comm line name
+	ld	a,(OPMODE)
+	push	af		; save old Local/Remote flag
 	call	SYSPRT		; go do port stuff (set terminal slave)
-	;*TODO: handle errors
-	jp	KERMIT
+	pop	bc		; pop old Local/Remote flag into B
+	ld	de,ERMS34
+	jp	c,PRTS4		; handle errors
+	ld	a,(OPMODE)
+	cp	b		; same as before?
+	jp	z,KERMIT	; yes, return
+	ld	c,a
+	ld	de,INMS16
+	call	PRTSTR		; "Kermit is "
+	push	de
+	ld	de,INMS20	; "now"
+	ld	a,c
+	or	a
+	jr	nz,PRTS3
+	ld	de,INMS21	; "no longer"
+PRTS3:	call	PRTSTR
+	pop	de
+	inc	de
+	call	PRTSTR		; " in local mode"
+	jp	KERMIT		; return
 
 PRTS2:	ld	de,ERMS33	; "invalid device"
-	call	PRTERR		; print error message
+PRTS4:	call	PRTERR		; print error message
 	jp	KERMIT		; and die
 
-ERMS33:	db	'?Invalid device',0
+ERMS33:	defb	'?Invalid device',0
+ERMS34:	defb	'?Failed to setup port',0
+INMS16:	defb	CR,LF,'Kermit is ',0,' in LOCAL mode.',0
+INMS20:	defb	'now',0
+INMS21:	defb	'no longer',0
 
 ; Subroutines for SET subcommands
 

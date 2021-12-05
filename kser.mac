@@ -20,6 +20,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 7, 4-Dec-2021 by H. Peraza: don't display transfer status Kermit
+;       is in Remote mode.
+;
 ; edit 6, 29-Mar-2021 by H. Peraza: implemented the server CD and SPACE
 ;       commands.
 ;
@@ -44,7 +47,7 @@
 
 	.Z80
 
-	ident	/06/
+	ident	/07/
 
 	include	KDEF.INC
 	include	FCB.INC
@@ -56,26 +59,32 @@
 	extrn	SINIT,SEOT,OUTPKN,OUTCHR,OUTSTR,COMPP,COUNTP,DIR2
 	extrn	OUTRTR,UPDRTR,ERROR,DEVSTR,DIRSTR,STRLEN,STRCPY
 	extrn	SETFCB,CHDIR,CPYNAM,MFINIT,MFEND,CVTLD,DSKFRE
-	extrn	ERMS32
+	extrn	PRTSTR,ERMS32
 
 	extrn	SRVFLG,ARGBLK,DATA,NUMPKT,PKTNUM,NUMRTR,NUMTRY,CURCHK
 	extrn	SFCB,QUIETD,SPSIZ,FILBUF,CBFPTR,SIZE,TEMP1,TEMP2,STATE
 	extrn	SRVTXT,OPROC,FCB,CURDEV,CURDIR,CDMSG,FREBKS,RQUOTE
-	extrn	QUOT8,QBCHR
+	extrn	QUOT8,QBCHR,OPMODE
 
 	extrn	PFN
 
 	cseg
 
-SRVVER:	db	'KSER  (6) 29-Mar-2021',0	; name, edit number, date
+SRVVER:	db	'KSER  (7)  4-Dec-2021',0	; name, edit number, date
 
 ; SERVER - Wait for and process Kermit packet(s).
 
-SERVER:	ld	a,(QUIETD)
+SERVER:	ld	a,(OPMODE)	; Remote operation?
+	or	a
+	jr	nz,SERV01	; no
+	ld	de,INMS16
+	call	PRTSTR		; else output message
+	jr	SERV02
+SERV01:	ld	a,(QUIETD)
 	or	a		; quiet display?
 	ld	bc,0
 	call	z,CSRPOS	; no, home cursor
-	ld	hl,0
+SERV02:	ld	hl,0
 	ld	(NUMPKT),hl	; set the number of packets to zero
 	ld	(NUMRTR),hl	; set the number of retries to zero
 	xor	a
@@ -86,7 +95,7 @@ SERVER:	ld	a,(QUIETD)
 	call	RPACK		; wait for packet
 	jp	NAK1		; trashed packet: NAK, retry
 	cp	'I'		; Info packet?
-	jr	nz,SERV1	; no
+	jp	nz,SERV1	; no
 	ld	a,(ARGBLK+1)	; get the number of data bytes
 	ld	hl,DATA		; pointer to the data
 	call	SPAR		; read in the data (decode what they want)
@@ -95,6 +104,10 @@ SERVER:	ld	a,(QUIETD)
 
 NAK1:	call	NAK		; NAK the packet
 	jp	SERVER		; and restart the server
+
+INMS16:	defb	CR,LF,'Entering server mode, you can now return to your local Kermit.'
+	defb	CR,LF,'Exit server by typing the Kermit FINISH command on your local'
+	defb	CR,LF,'machine.',CR,LF,0
 
 ; Process the packet
 
@@ -134,10 +147,13 @@ SERV5:	cp	'G'		; Generic command?
 	cp	'F'		; Finish?
 	jp	nz,SERV50	; no
 	call	ACKP		; ACK the command
+	ld	a,(OPMODE)	; Remote operation?
+	or	a
+	jr	z,SERV5A	; yes
 	ld	a,(QUIETD)
 	or	a		; quiet display?
 	call	z,SCREND	; no, position cursor
-	xor	a
+SERV5A:	xor	a
 	ld	(SRVFLG),a	; exit server mode
 	jp	KERMIT		; back to command mode
 

@@ -20,6 +20,10 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 16, 4-Dec-2021 by H. Peraza: Ctrl/Z on command input exits Kermit.
+;       Fixed the 'backspace key erasing the prompt' bug after command
+;       autocompletion.
+;
 ; edit 15, 21-Mar-2021 by H. Peraza: use PRTERR to output error messages.
 ;
 ; edit 14, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
@@ -125,7 +129,7 @@
 
 	.Z80
 
-	ident	/15/
+	ident	/16/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -135,6 +139,7 @@
 
 	extrn	KERMIT,PRCRLF,PRTSTR,OUTCON,CLRTOP,CLRLIN,DELCHR
 	extrn	MFINIT,MFNAME,MFEND,P20LN,GETCT,PRTERR,R,RSKP
+	extrn	EXIT
 
 	extrn	CMDBUF,CMDPTR,NUMBER,CMHLP,TEMP1,TAKFLG,SFCB,FCB
 
@@ -142,7 +147,7 @@
 
 	cseg
 
-CMDVER:	defb	'KCMD (14)  8-Jan-2021',0	; name, edit number, date
+CMDVER:	defb	'KCMD (16)  4-Dec-2021',0	; name, edit number, date
 
 ; This routine prints the prompt in DE and specifies the reparse address.
 ; Called by:  KERMIT
@@ -305,8 +310,10 @@ CMTX3B:	sub	'0'		; else it should be an octal number
 	jr	CMTXT1		; else loop
 
 CMTXT4:	ld	hl,(CMDPTR)	; get a pointer into the buffer
-	inc	hl		; bump past '?'
+	inc	hl		; bump past the '?'
 	ld	(CMDPTR),hl
+	ld	hl,CMAFLG
+	ld	(hl),0		; clear the action flag
 CMTX5:	call	CMTX5C
 	jp	CMTXT1		; put this into a subroutine
 
@@ -364,6 +371,8 @@ GNUM21:	call	PRTSTR		; say it
 	ld	hl,(CMCPTR)
 	dec	hl		; decrement and save the buffer pointer
 	ld	(CMCPTR),hl
+	ld	hl,CMCCNT
+	dec	(hl)		; decrement character count
 	ld	hl,CMDBUF
 	call	PRTCMD		; print what has already been entered
 	xor	a
@@ -434,6 +443,8 @@ CMCFR2:	cp	'?'		; curious?
 	ld	hl,(CMCPTR)
 	dec	hl		; decrement and save the buffer pointer
 	ld	(CMCPTR),hl
+	ld	hl,CMCCNT
+	dec	(hl)		; decrement character count
 	ld	hl,CMDBUF
 	call	PRTCMD		; reprint command
 	xor	a		; turn off the action flag
@@ -489,8 +500,8 @@ CMKEY3:	dec	e		; decrement the number of chars left
 	or	a		; is it a terminator?
 	jp	p,CMKEY4	; if positive, it is not
 	and	7Fh		; turn off the minus bit
-	cp	'?'
-	jr	nz,CMKY31
+	cp	'?'		; user is curious?
+	jr	nz,CMKY31	; no
 	xor	a
 	ld	(CMAFLG),a	; turn off the action flag
 	ld	hl,CMCCNT	; decrement the char count
@@ -513,7 +524,7 @@ CMKEY3:	dec	e		; decrement the number of chars left
 	jp	REPARS		; reparse everything
 
 CMKY31:	cp	ESC		; is it an escape?
-	jp	nz,CMKY35
+	jp	nz,CMKY35	; no
 	xor	a
 	ld	(CMAFLG),a	; turn off the action flag
 	push	de
@@ -557,12 +568,8 @@ CMKY33:	ld	a,(hl)		; get the next char
 	ld	(CMCCNT),a
 	jp	CMKY33		; loop
 
-CMKY34:	ld	a,(CMCCNT)	; get the character count
-	inc	a		; increment and save it
-	ld	(CMCCNT),a
-	ex	de,hl		; put the command buffer pointer in HL
-	ld	a,' '		; get a blank
-	ld	(hl),a		; put it in the command buffer
+CMKY34:	ex	de,hl		; put the command buffer pointer in HL
+	ld	(hl),' '	; put a blank in the command buffer
 	inc	hl		; increment the pointer
 	ld	(hl),0
 	ld	de,(CMCPTR)	; get the old pointer
@@ -575,7 +582,9 @@ CMKY34:	ld	a,(CMCCNT)	; get the character count
 	pop	de
 	jp	CMKY37
 
-CMKY35:	push	hl
+CMKY35:	cp	CTRLZ		; Ctrl/Z?
+	jp	z,EXIT		; yes, exit
+	push	hl
 	push	de
 	call	CMAMBG		; test for ambiguity
 	jp	CMKY36		; not ambiguous
@@ -948,11 +957,13 @@ CMGTC3:	push	af
 	jr	z,CMGTC4
 	cp	LF
 	jr	z,CMGTC4
+	cp	CTRLZ
+	jr	z,CMGTC4
 	cp	FF
 	ret	nz		; not an action char, just return
 CMGTC4:	push	hl
 	ld	hl,(CMDPTR)
-	dec	hl		; backup to last CR, LF, FF or '?'
+	dec	hl		; backup to last CR, LF, ^Z, FF or '?'
 	ld	(CMDPTR),hl
 	pop	hl
 CMGTC5:	or	80h		; make the char negative to indicate it is
@@ -1005,8 +1016,7 @@ CMINB2:	cp	BS		; Backspace?
 	jr	nz,CMINB4
 CMINB3:	ld	a,(CMCCNT)	; decrement the char count by two
 	dec	a
-	dec	a
-	or	a		; have we gone too far?
+	dec	a		; have we gone too far?
 	jp	p,CMNB32	; no, proceed
 	ld	e,BELL		; else ring the bell
 	call	OUTCON
@@ -1026,12 +1036,15 @@ CMINB4:	cp	'?'		; is it a question mark?
 	jr	z,CMINB6
 	cp	ESC		; is it an escape?
 	jr	z,CMINB6
+	cp	CTRLZ		; is it Ctrl/Z?
+	jr	z,CMINB6
 	cp	CR		; is it a carriage return?
 	jr	z,CMINB5
 	cp	LF		; is it a line feed?
 	jr	z,CMINB5
 	cp	FF		; is it a formfeed?
-	jr	nz,CMINB8	; no - just store it and 
+	jr	nz,CMINB8	; no, just store it and test if buffer
+				;  is overflowing, else get another char
 	call	CLRTOP
 CMINB5:	ld	a,(CMBFLG)	; allowing initial blank word (<CR>)?
 	or	a

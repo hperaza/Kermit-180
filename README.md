@@ -39,6 +39,7 @@ Kermit-180 has been tested on a P112 (Z180) machine running RSX180 and on a Z280
 |Printer control|No|
 
 ## Quick start guide
+
 1. Start Kermit at the PC side and setup it accordingly, the following settings were used with C-Kermit 9.0.302 under Linux:  
 `set line /dev/ttyUSB1`   (or whatever line your machine is connected to)  
 `set speed 19200` (this is the default for the Z280RC quad-serial board under RSX280)  
@@ -71,21 +72,10 @@ As with the PC Kermit, you can save the above command sequence into a text file 
 etc.
 
 ## Bugs and Limitations
-At the moment, Kermit-180 is not able to communicate with a remote machine using the same terminal line the program was invoked from (i.e. `set line ti:` won't work.) That's not a big problem since machines running RSX180 or RSX280 usually have access to more than one terminal. Using a separate communication line is even desired, as it allows you to monitor and control the file transfer from the login terminal.
-
-Also, the current version of Kermit-180 is built by default as a privileged task, as it needs to set the characteristics of the terminal used for communications to *slave* with *echo disabled,* and those are privileged operations for terminals other than the user's current one. This has the undesirable side effect that Kermit-180 can access any file in the system, and in any directory, regardless of the current user privileges. That is not a problem as long as Kermit-180 is not *INS*talled, since only privileged users can run a privileged task.
+Kermit-180 is built by default as a non-privileged task, meaning that in *local* mode it cannot change the characteristics of the terminal used for communications unless the terminal has been set to *public* by the system administrator. Specifically, Kermit-180 needs to set the terminal mode to *slave* with *echo disabled,* and those are privileged operations for terminals other than the user's current one. *Remote* mode does not suffer from that limitation, as it uses the user's current terminal for communications.
 
 The filename completion (e.g. for DIR or ERA commands) is not working fully correctly yet: pressing ESC or TAB a second time appends part of the file extension again to the completed file name, etc.
 
-When using C-Kermit 9.0 on Linux, a file transfer from the PC to the Z280RC sometimes stalls and then aborts with a "Too many retries" error. Usually restarting the transfer fixes the problem, but it can get stubborn stopping at approximately the same spot over and over. The older C-Kermit 5A(190) does not show the problem.
+The current version of Kermit-180 is not able to process file attribute information, and therefore the correct file type (text or binary) has to be set manually at both ends before starting the transfer.
 
-**Update:** the problem was traced back to C-Kermit taking certain liberties with
-the Kermit protocol: specifically, not prefixing all control characters like it
-should.  The `set control-character prefixed all` fixes the problem.  Also,
-I'd recommend to use `set file patterns off` and `set transfer mode manual`
-as well, otherwise C-Kermit will try to switch automatically to ascii mode
-when transferring text files in binary mode without Kermit-180 being aware of
-the change. The result is a text file with duplicated carriage return characters
-being received at the RSX180/280 side if the file at the PC side already had
-CR/LF line endings.
-
+Some modern Kermit programs (e.g. C-Kermit 9.0 on Linux) don't prefix all control characters by default as the protocol specifies, and therefore file transfers the PC to the Z280RC may fail randomly. The solution is to use the `set control-character prefixed all` command at the PC side. I'd recommend using `set file patterns off` and `set transfer mode manual` as well, otherwise C-Kermit will try to switch automatically to ascii mode when transferring text files in binary mode without Kermit-180 being aware of the change. The result is a text file with duplicated carriage return characters being received at the RSX180/280 side if the file at the PC side already had CR/LF line endings.

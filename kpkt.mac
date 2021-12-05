@@ -21,6 +21,9 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 33, 4-Dec-2021 by H. Peraza: suppress output of status and (most)
+;       error messages during Remote operation.
+;
 ; edit 32, 28-Mar-2021 by H. Peraza: packet character encoding was moved
 ;       into a separate ENCODE routine that can be called from the server
 ;       code. SDATA and SEOF were also slightly modified to support server
@@ -239,7 +242,7 @@
 
 	.Z80
 
-	ident	/32/
+	ident	/33/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -257,7 +260,7 @@
 	extrn	GETFIL,SCRST,RPPOS,SPPOS,SETPAR,CLRTOP,SCREND
 	extrn	MAKFIL,CFMCMD,SCRNRT,SCRERR,CLSETK,SYSSCR,FCBSTR
 	extrn	OPENRW,CLOSEF,CLOSE2,SETFCB,FCBS2,STRLEN,DELET2
-	extrn	MAKFI1,MFEND,CLREOL,FLSCON,PRTERR,R,RSKP
+	extrn	MAKFI1,MFEND,CLREOL,FLSCON,PRTERR,R,RSKP,DELAY
 
 	extrn	GTRXFL,REMDAT,RDL,QUIETD,STATE,CZSEEN,NUMPKT
 	extrn	NUMRTR,PKTNUM,NUMTRY,REMTXT,AUTORC,DATA,ARGBLK
@@ -268,6 +271,7 @@
 	extrn	FLWFLG,CHRCNT,BUFPNT,FMFLG,TEMP2,SOHCHR,FNBUF
 	extrn	IBMFLG,PACKET,DBGFLG,RECPKT,TAKFLG,RCVSOP,PRNFLG
 	extrn	SNDSOP,TACFLG,TIMFLG,SFCB,FCB,FCB2,SRVFLG,SRVTXT
+	extrn	OPMODE
 
 	extrn	ERMS15
 
@@ -275,7 +279,7 @@
 
 	cseg
 
-PKTVER:	defb	'KPKT (32) 28-Mar-2021',0	; name, edit number, date
+PKTVER:	defb	'KPKT (33)  4-Dec-2021',0	; name, edit number, date
 
 ; GET command
 ; Here from: KERMIT
@@ -292,6 +296,9 @@ READ:	ld	a,0FFh		; we are doing a Get
 	ex	de,hl		; get pointer into HL
 	ld	(hl),0		; put in a trailing null for printing
 	call	INIT		; clear the line and initialize the buffers
+	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	jp	z,READ0A	; yes
 	ld	a,(QUIETD)	; quiet display?
 	and	a
 	jr	z,READ01	; no, go ahead and position cursor
@@ -319,7 +326,6 @@ READ1:	xor	a		; we received a Server Send command
 READ0:	xor	a
 	ld	(RDL),a		; flag entry as Receive, not Get
 	ld	(GTRXFL),a	; doing a Receive, so reset flag
-	call	INIT		; clear line, initialise buffers
 READ0A:	ld	de,REMNAM	; save local name here
 	ld	a,CMTXT
 	call	COMND		; read second filename if present
@@ -329,12 +335,13 @@ READ0A:	ld	de,REMNAM	; save local name here
 				;  pretend get for printing filename
 	ld	a,(RDL)		; look at first name
 	or	a		; Receive or Get?
-	jp	z,READ12	; Receive
-
-	ld	a,'I'		; set state to send "I" packet
+	jr	nz,READ12	; Get
+	call	INIT		; clear line, initialise buffers
+	call	RMREAD		; output message if in Remote mode
+	jr	READ13
+READ12:	ld	a,'I'		; Get, set state to send "I" packet
 	ld	(STATE),a
-
-READ12:	xor	a
+READ13:	xor	a
 	ld	(CZSEEN),a	; clear the ^X/^Z flag initially
 	ld	hl,0
 	ld	(NUMPKT),hl	; set the number of packets to zero
@@ -450,6 +457,16 @@ READ8:	ld	de,INFMS4	; anything else is equivalent to "Abort"
 	call	FINMES
 	jp	KERMIT
 
+RMREAD:	ld	a,(OPMODE)	; Remote operation?
+	or	a
+	ret	nz		; no, return
+	ld	de,INFMS1
+	call	PRTSTR		; else output message
+	xor	a
+	ret
+
+INFMS1:	defb	CR,LF,'Return to your local Kermit and give a SEND command'
+	defb	CR,LF,0
 INFMS3:	defb	BELL,'Completed',0
 INFMS4:	defb	BELL,'Failed',0
 INMS13:	defb	BELL,'Interrupted',0
@@ -459,9 +476,12 @@ AUTMES:	defb	CR,LF,LF,'[Automatically receiving, type ^C to abort]'
 
 ; Output current packet number to the screen
 
-OUTPKN:	ld	a,(QUIETD)	; quiet display?
+OUTPKN:	ld	a,(OPMODE)	; Remote mode?
 	and	a
-	ret	nz		; yes, so don't write...
+	ret	z		; yes, so don't write
+	ld	a,(QUIETD)	; quiet display?
+	and	a
+	ret	nz		; yes, don't write either
 	call	SCRNP		; position cursor
 	ld	hl,(NUMPKT)
 	call	NOUT		; write the packet number
@@ -588,8 +608,11 @@ RFILE3:	cp	'F'		; start of file?
 	jr	nz,RFIL3A	; yes, don't open a file
 	call	GOFIL		; get a file to write to, and init output buffer
 	jp	ABORT		; on error, Abort
+	ld	a,(OPMODE)	; Remote mode?
+	or	a
+	jr	z,RFIL3A	; yes, don't output anything
 	ld	a,(QUIETD)	; quiet display?
-	and	a
+	or	a
 	call	z,SCRFLN	; no, position cursor and erase to end of line
 	ld	ix,FCB2		; point to FCB
 	ld	hl,FNBUF	; get address of string buffer
@@ -849,6 +872,9 @@ SEND11:	call	MFINIT		; initialize file search
 SEND12:	ld	a,(SRVFLG)
 	or	a		; Server mode?
 	jp	z,PRTERR	; no, output error message after newline
+	ld	a,(OPMODE)	; Remote mode?
+	or	a
+	ret	z		; yes, return
 	push	de
 	ld	a,(QUIETD)
 	or	a		; quiet display?
@@ -862,7 +888,17 @@ SEND12:	ld	a,(SRVFLG)
 	jp	PRCRLF		; and output a newline
 
 SEND14:	call	INIT		; clear the line and initialize the buffers
-	xor	a
+	ld	a,(OPMODE)	; Remote operation?
+	or	a
+	jr	nz,SEND15	; no
+	ld	a,(SRVFLG)	; Server mode?
+	or	a
+	jr	nz,SEND15	; yes
+	ld	de,INFMS2
+	call	PRTSTR		; else output message
+	ld	hl,5
+	call	DELAY		; and wait 5 seconds before start
+SEND15:	xor	a
 	ld	(PKTNUM),a	; set the packet number to zero
 	ld	(NUMTRY),a	; set the number of tries to zero
 	ld	(WRN8),a	; we haven't sent the 8-bit-lost warning
@@ -930,6 +966,8 @@ SEND9:	ld	de,INFMS4	; anything else is equivalent to "Abort"
 	call	FINMES
 	jp	KERMIT
 
+INFMS2:	defb	CR,LF,'Return to your local Kermit and give a RECEIVE command'
+	defb	CR,LF,0
 INMS23:	defb	'Sending...',0
 
 ; Send routines
@@ -1061,12 +1099,15 @@ SFILE4:	; copy remote name into packet to send
 	ld	(hl),0		; end with a null for printing
 
 SFIL13:	ld	(ARGBLK+1),a	; store number of chars in file name
+	ld	a,(OPMODE)	; Remote mode?
+	and	a
+	jr	z,SFIL15	; yes
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	call	z,SCRFLN	; no, position cursor and erase to end of line
 	ld	de,DATA		; print the file name though, in either case
 	call	PRTSTR
-	ld	a,(PKTNUM)	; get the packet number
+SFIL15:	ld	a,(PKTNUM)	; get the packet number
 	ld	(ARGBLK),a
 	ld	a,'F'		; file header packet
 	call	SPACK		; send the packet
@@ -2290,9 +2331,12 @@ SPACK7:	ld	a,(DBGFLG)
 	jr	z,SPACK8
 	push	hl		; yes, save address of end of packet
 	ld	(hl),0		; null-terminate the packet for display
+	ld	a,(OPMODE)	; Remote mode?
+	and	a
+	jr	z,SPAC7A	; so don't say a thing
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jp	nz,SPAC7A	; so don't say a thing
+	jr	nz,SPAC7A	; don't say a thing either
 	call	SPPOS		; position cursor
 	ld	de,PACKET+1	; print the packet
 	call	PRTSTR
@@ -2618,9 +2662,12 @@ INPKT6:	ld	hl,(PKTPTR)	; reload packet pointer
 	or	a
 	jr	z,INPKT7
 	inc	hl		; point to next char
+	ld	a,(OPMODE)	; Remote mode?
+	and	a
+	jr	z,INPKT7	; so don't say a thing
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	jr	nz,INPKT7	; so don't say a thing
+	jr	nz,INPKT7	; don't say a thing either
 	call	RPPOS		; position cursor
 	ld	de,RECPKT+1	; print the packet
 	call	PRTSTR
@@ -2840,9 +2887,12 @@ CRCTB2:	defw	00000h
 ; Called by: RINIT, RFILE, RDATA, SINIT, SFILE, SDATA, SEOF,
 ;            SEOT, PARWRN, GOFIL, OUTBUF
 
-ERROR:	ld	a,(QUIETD)	; a quiet display?
+ERROR:	ld	a,(OPMODE)	; Remote operation?
 	and	a
 	jr	nz,ERROR0	; so don't say a thing
+	ld	a,(QUIETD)	; a quiet display?
+	and	a
+	jr	nz,ERROR0	; don't say a thing either
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
 	call	z,SCRERR	; no, position the cursor
@@ -2850,7 +2900,10 @@ ERROR0:	ld	a,'A'		; set the state to Abort
 	ld	(STATE),a
 	jr	ERROR2
 
-ERROR1:	ld	a,(QUIETD)	; a quiet display?
+ERROR1:	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	jr	z,ERROR2	; yes
+	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	call	z,PRCRLF	; no, print newline
 ERROR2:	ld	a,(ARGBLK+1)	; get the length of the data
@@ -2863,16 +2916,22 @@ ERROR2:	ld	a,(ARGBLK+1)	; get the length of the data
 	ld	a,(REMTXT)	; doing a Remote command?
 	or	a
 	jr	nz,ERRR2A	; yes, print message, quiet or not!
+	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	ret	z		; so don't say a thing
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
-	ret	nz		; so don't say a thing
+	ret	nz		; don't say a thing either
 ERRR2A:	call	PRTSTR
 	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	call	z,PRCRLF	; no, print newline
 	ret	
 
-ERROR3:	ld	a,(QUIETD)	; a quiet display?
+ERROR3:	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	ret	z		; yes, return
+	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	ret	nz		; so don't say a thing
 	ld	a,(REMTXT)	; doing a Remote command?
@@ -2890,10 +2949,13 @@ ERR3A:	call	PRTSTR		; print error message
 ; Set up for file transfer.
 ; Called by READ, SEND.
 
-INIT:	ld	a,(QUIETD)	; a quiet display?
+INIT:	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	jr	z,INIT1
+	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	call	z,SYSSCR	; no, fix up screen
-	call	SELMDM		; select modem
+INIT1:	call	SELMDM		; select modem
 	call	PURMDM		; purge any pending input data
 	call	SELCON		; select console again.
 	ret	
@@ -2930,7 +2992,10 @@ UPDRTR:	ld	hl,(NUMRTR)
 	ld	a,(REMTXT)	; doing a Remote server command?
 	or	a
 	ret	nz		; yes, keep mum
-OUTRTR:	ld	a,(QUIETD)	; a quiet display?
+OUTRTR:	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	ret	z		; yes, return
+	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	ret	nz		; so don't say a thing
 	call	SCRNRT		; position cursor
@@ -2957,7 +3022,10 @@ INMS25:	defb	BELL,'Warning: eighth bit cannot be sent',0
 ; Print message in status field. Address of message is in DE.
 ; Called by: READ, SEND
 
-FINMES:	ld	a,(QUIETD)	; a quiet display?
+FINMES:	ld	a,(OPMODE)	; Remote operation?
+	and	a
+	ret	z		; so don't say a thing
+	ld	a,(QUIETD)	; a quiet display?
 	and	a
 	jr	z,FINME0	; so do usual stuff
 	push	de		; save pointer to completion message

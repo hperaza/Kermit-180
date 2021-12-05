@@ -252,14 +252,14 @@
 
 	.Z80
 
-	ident	/4.21/
+	ident	/4.22/
 
 	include	KDEF.INC
 	include	SYSFN.INC
 	include	FCB.INC
 	include	ERRORS.INC
 
-	public	MITVER,KERMIT,KERMT3
+	public	MITVER,KERMIT,KERMT3,EXIT
 
 	extrn	PRTSTR,SYSINIT,SELCON,DEVSTR,DIRSTR,PROMPT,KEYCMD
 	extrn	TELNET,COPY,DIR,ERA,FINISH,READTK,READ,LOGOUT,STRING
@@ -520,8 +520,8 @@ BREAK:	call	CFMCMD		; get return
 
 ; This is the BYE command.  It tells the remote KERSRV to logout, then exits.
 
-BYE:	call	CFMCMD		; confirm,,,
-	call	LOGO		; tell the main frame to logout
+BYE:	call	CFMCMD		; confirm...
+	call	LOGO		; tell the mainframe to logout
 	jp	KERMIT		; if it fails, don't exit
 	call	SYSBYE		; success, do system-dependent cleanup
 	jp	EXIT1		; exit Kermit

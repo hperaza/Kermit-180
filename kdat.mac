@@ -19,6 +19,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 22, 4-Dec-2021 by H. Peraza: added Local/Remote operation flag.
+;
 ; edit 21, 19-Mar-2021 by H. Peraza: added Server Mode flag.
 ;
 ; edit 20, 27-Dec-2020 by H. Peraza: converted to Z80, targeting RSX180/280.
@@ -102,7 +104,7 @@
 
 	.Z80
 
-	ident	/21/
+	ident	/22/
 
 	include	KDEF.INC
 	include	FCB.INC
@@ -124,13 +126,13 @@
 	public	OLDTRY,RTIME,WRN8,DSCFLG,QUOT8,FILBUF,RPADCH,RQUOTE
 	public	SQUOTE,PACKET,SPADCH,SOHCHR,HOSTHS,HOSTNM,QBCHR
 	public	OUTPNT,RECPKT,RECPKX,TAKCNT,RPRMPT,CMDPTR,STARC
-	public	REXBUF,REXBFL,REXCNT,SRVFLG,SRVTXT,OPROC
+	public	REXBUF,REXBFL,REXCNT,SRVFLG,SRVTXT,OPROC,OPMODE
 
 	extrn	TTAB,SPDTBL,SPHTBL
 
 	dseg
 
-DATVER:	defb	'KDAT (21) 19-Mar-2021',0
+DATVER:	defb	'KDAT (22)  4-Dec-2021',0
 
 	page
 
@@ -223,6 +225,8 @@ FILEIO:	defb	0	; line-by-line from file (default off)
 NUMBER:	defs	2	; number in binary form from user input
 MAXBSC:	defs	1	; max number of buffers for multi-sector buffering
 CHRCNT:	defs	2	; number of chars in the file buffer
+
+OPMODE:	defb	0	; set to 0 for Remote operation, <> 0 for Local
 
 ; Command tail data space, etc.
 

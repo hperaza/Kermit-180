@@ -27,7 +27,7 @@ $(OBJ): %.rel: %.mac *.inc
 	$(ZXCC) $(ZSM4) -"="$</l
 
 $(PROG): $(OBJ) syslib.lib
-	$(ZXCC) $(TKB) -"$@,,kermit.map=kmit,kcom,kpkt,krem,kser,ktt,kcmd,kutl,kdat,ksys,syslib/lb/of=tsk/task=...ker/ext=8200/priv"
+	$(ZXCC) $(TKB) -"kermit,,kermit=kmit,kcom,kpkt,krem,kser,ktt,kcmd,kutl,kdat,ksys,syslib/lb/of=tsk/task=...ker/ext=8200/asg=TI:1-2,SY:3-8"
 #	cat kermit.map
 
 copy: $(PROG)

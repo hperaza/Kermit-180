@@ -20,6 +20,11 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 16, 4-Dec-2021 by H. Peraza: ignore modem input in TELNET command
+;       if in Remote mode (i.e. when PORT is set to TI:), as we know that
+;       the characters will arrive only via console input. Otherwise the
+;       escape sequence to exit TELNET mode will not be recognized.
+;
 ; edit 15, 22-Mar-2021 by H. Peraza: flush modem output buffer in CONCHR
 ;       to ensure proper char-by-char TELNET operation.
 ;
@@ -144,7 +149,7 @@
 
 	.Z80
 
-	ident	/15/
+	ident	/16/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -161,7 +166,7 @@
 	extrn	STBUFF,STRCNT,REPCNT,STARC,REXBFL,REXCNT,EOFLAG
 	extrn	PRNFLG,ESCCHR,LOGFLG,SYSCLS,STAT01,ECOFLG,BUFPNT
 	extrn	BUFLEN,CHRCNT,TACFLG,TACCHR,VTFLG,REXBUF,PTTAB
-	extrn	LOGFCB,FCB,FCB2
+	extrn	LOGFCB,FCB,FCB2,OPMODE
 
 	extrn	ERMS15
 
@@ -169,7 +174,7 @@
 
 	cseg
 
-TTVER:	defb	'KTT  (15) 22-Mar-2021',0
+TTVER:	defb	'KTT  (16)  4-Dec-2021',0
 
 ; This is the TRANSMIT command.  It attempts to send a file, even though
 ; there is no KERMIT on the other side.
@@ -449,17 +454,20 @@ INMS8A:	db	' and ? for a list of available commands]',CR,LF,0
 ; Returns: nonskip, console selected.
 ; Called by: XNEXT, REXMIT, TELNET
 
-PRTCHR:	call	SELMDM		; select modem port
+PRTCHR:	ld	a,(OPMODE)	; Remote operation?
+	or	a
+	jr	z,PRTCH0	; yes, return
+	call	SELMDM		; select modem port
 	call	INPMDM		; try to get a character from it
 	push	af		; restore to console
 	call	SELCON		; select console
 	pop	af		; restore the (possible character) read
 	or	a		; test character
-	jp	nz,PRTCH0	; if non-zero, process it.
-	ld	(PRTCNT),a	; zero out prt fairness count
+	jp	nz,PRTCH5	; if non-zero, process it.
+PRTCH0:	ld	(PRTCNT),a	; zero out prt fairness count
 	ret			; return
 
-PRTCH0:	and	7Fh		; drop parity bit
+PRTCH5:	and	7Fh		; drop parity bit
 	ld	(COMCHR),a	; save it in case we need it again
 	ld	a,(VTFLG)	; get the VT52 emulation flag
 	cp	VTDEFE		; are we doing external emulation?

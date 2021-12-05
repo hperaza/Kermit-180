@@ -20,6 +20,8 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
+; edit 20, 4-Dec-2021 by H. Peraza: fix remote operation (line set to TI:).
+;
 ; edit 19, 22-May-2021 by H. Peraza: when selecting a new line, update the
 ;       SPEED variable with the value obtained from device characteristics.
 ;
@@ -135,7 +137,7 @@
 
 	.Z80
 
-	ident	/19/
+	ident	/20/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -168,7 +170,7 @@
 	extrn	VERSION,BANNER,RSXVER,CURDEV,CURDIR,$MEMRY,BUFADR
 	extrn	BUFSEC,BUFLEN,BUFPNT,MAXBSC,DBGFLG,HOSTNM,PORT
 	extrn	TEMP1,NUMBER,CHRCNT,TAKFLG,TAKBUF,TAKFCB,FNBUF
-	extrn	FCBS2,SRVFLG,SPEED
+	extrn	FCBS2,SRVFLG,SPEED,OPMODE
 
 	extrn	ATTACH,DETACH,PUTCH,PUTSTR,TTLUN,TTFLSH,UCASE
 	extrn	CPHLDE,CVTBD,CVTLD,BCD2BIN,CVTBH
@@ -189,12 +191,15 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (19) 22-May-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (20)  4-Dec-2021',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
 
 SYSINIT:
+	ld	hl,0
+	ld	de,GTKBUF
+	SC	.GTSK		; get task information
 	ld	hl,TCKSEC
 	ld	c,I.TCKS
 	SC	.GIN		; get ticks/sec for delay function
@@ -213,7 +218,7 @@ SYSINIT:
 	ld	(TTLUN),a
 	ld	b,a
 	SC	.ALUN		; assign LUN to terminal
-	ld	de,ASTCON	; terminal AST routne address
+	ld	de,ASTCON	; terminal AST routine address
 	ld	c,LUNTI
 	call	ATTACH		; attach terminal with ASTs
 	ret	c
@@ -228,6 +233,7 @@ SYSINIT:
 	ld	(OPTR),hl	; reset input...
 	ld	hl,IBUF
 	ld	(IPTR),hl	; ...and output buffer pointers
+	ld	(OPMODE),a	; default mode is Remote
 	ld	(MDMSET),a	; no comm line attached yet
 	ld	a,(TC.ANS+1)	; get terminal type
 	or	a		; ANSI?
@@ -284,9 +290,6 @@ SINIT2:	ld	(de),a		; store system type
 NBUF	equ	8*1024		; 8K
 NSEC	equ	NBUF/BUFSIZ	; 8K / number of bytes per sector
 
-	ld	hl,0
-	ld	de,GTKBUF
-	SC	.GTSK		; get task information
 	ld	hl,(GTKBUF+GT.END) ; get top of available memory
 	ld	de,($MEMRY)	; get start of buffer
 	ld	(BUFADR),de	; store it
@@ -342,6 +345,7 @@ SYSEXIT:
 	call	DETACH		; detach from comm line
 	xor	a
 	ld	(MDMSET),a
+	ld	(OPMODE),a
 sysx1:	xor	a
 	ld	(TTCHR1+1),a
 	ld	hl,QIOSTC
@@ -624,9 +628,6 @@ SPHTBL:	defb	CR,LF,'   50     75    110    134.5  150    200    300    600'
 
 ; This is the system-dependent SET PORT command.
 
-; TODO:
-; - check if same as the current terminal...
-
 SYSPRT:	ld	a,(MDMSET)
 	or	a		; comm line attached?
 	jr	z,SYSP1		; no
@@ -639,23 +640,27 @@ SYSPRT:	ld	a,(MDMSET)
 	xor	a
 	ld	(MDMSET),a
 
-SYSP1:	ld	de,(PORT)	; get name of new comm line
-	ld	a,(PORT+2)
-	ld	c,a
+SYSP1:	ld	hl,PORT		; get a pointer to name of new comm line
 	ld	b,LUNMDM
-	SC	.ALUN		; assign LUN
+	call	ALUN		; assign LUN and get device info
 	ret	c		; on error, return
 
-	;*TODO: attach with timeout, else the program will be
-	; blocked here until the terminal is detached.
-
 	xor	a
-	ld	(ICNT),a
+	ld	(ICNT),a	; reset I/O counters and pointers
 	ld	(OCNT),a
+	push	hl
 	ld	hl,OBUF
 	ld	(OPTR),hl
 	ld	hl,IBUF
 	ld	(IPTR),hl
+	pop	hl
+
+	ld	de,GTKBUF+GT.TI
+	call	CMPDEV		; new line same as current terminal?
+	jr	z,SYSP2		; yes, don't change settings
+
+	;*TODO: attach with timeout, else the program will be
+	; blocked here until the terminal is detached.
 
 	ld	de,0		; no ASTs
 	ld	c,LUNMDM
@@ -664,6 +669,7 @@ SYSP1:	ld	de,(PORT)	; get name of new comm line
 
 	ld	a,0FFh
 	ld	(MDMSET),a	; set flag
+	ld	(OPMODE),a	; now in Local mode
 
 	ld	hl,MDMGTC
 	SC	.QIO		; remember original settings
@@ -674,24 +680,94 @@ SYSP1:	ld	de,(PORT)	; get name of new comm line
 
 	ld	hl,MDMSTC
 	SC	.QIO		; slave terminal, disable echo
-	ret	
+	ret	c
+	ld	a,(IOSB)
+	or	a
+	ret	z
+	scf
+	ret
+
+SYSP2:	xor	a
+	ld	(MDMSET),a
+	ld	(OPMODE),a	; now in Remote mode
+	ret
+
+CMPDEV:	ld	b,3
+cmp1:	ld	a,(de)
+	cp	(hl)
+	ret	nz
+	inc	hl
+	inc	de
+	djnz	cmp1
+	ret
 
 ; Select modem port, called before using INPMDM or OUTMDM
 ; Preserves BC, DE, HL.
 
-SELMDM:
-	ret	
+SELMDM:	ld	a,(MDMSET)
+	or	a		; modem line already attached?
+	ret	nz		; yes, return
+
+	push	hl
+	push	de
+	push	bc
+	ld	de,0		; no ASTs
+	ld	c,LUNMDM
+	call	ATTACH		; (re)attach to comm line
+	jr	c,selm1
+
+	ld	a,0FFh
+	ld	(MDMSET),a	; set flag
+
+	ld	hl,MDMGTC
+	SC	.QIO		; remember original settings
+
+	ld	hl,MDMSTC
+	SC	.QIO		; slave terminal, disable echo
+
+selm1:	pop	bc
+	pop	de
+	pop	hl
+	ret
 
 ; Select console port, called before using INPCON or OUTCON
 ; Preserves BC, DE, HL.
 
-SELCON:
-	ret	
+SELCON:	; postpone operation until next console read
+	ret
+
+RESCON:	ld	a,(MDMSET)
+	or	a		; modem line attached?
+	ret	z		; no, return
+
+	ld	a,(OPMODE)
+	or	a		; are we in Local mode?
+	ret	nz		; yes, return
+
+	push	hl
+	push	de
+	push	bc
+	ld	de,ASTCON	; terminal AST routine address
+	ld	c,LUNTI
+	call	ATTACH		; (re)attach terminal with ASTs
+	jr	c,selc1
+
+	ld	hl,MDMRST
+	SC	.QIO		; restore original comm line settings
+
+	xor	a
+	ld	(MDMSET),a	; clear flag
+
+selc1:	pop	bc
+	pop	de
+	pop	hl
+	ret
 
 ; Get character from console, or return zero.
 ; Result is returned in A.  Destroys DE, HL.
 
-INPCON:	push	ix
+INPCON:	call	RESCON
+	push	ix
 	call	TTFLSH		; flush terminal output
 	ld	ix,TTQ
 	call	QGET		; fetch char, if available
@@ -703,7 +779,8 @@ INPCON:	push	ix
 ; Wait for and get character from console.
 ; Result is returned in A.  Destroys DE, HL.
 
-GETCON:	push	ix
+GETCON:	call	RESCON
+	push	ix
 	push	bc
 	call	TTFLSH		; flush terminal output
 GC1:	ld	e,EFNGC
@@ -714,7 +791,9 @@ GC1:	ld	e,EFNGC
 	ld	e,EFNGC
 	SC	.WTSE		; else wait for character to arrive
 	jr	GC1		; loop to get char
-GC2:	pop	ix
+GC2:	or	a
+	jr	z,GC1		; ignore null chars
+	pop	ix
 	pop	bc
 	ret
 
@@ -954,7 +1033,7 @@ CLRLIN:	ld	e,CR
 	ld	de,TK
 	jp	PRTSTR		; clear to end of line
 
-; Erase the whole screen, and go home. preserves b (but not c)
+; Erase the whole screen, and go home. preserves B (but not C)
 
 CLRTOP:	ld	de,ERASCR
 	jp	PRTSTR
@@ -1619,11 +1698,12 @@ ERA:	ld	a,CMIFI		; parse a file-spec
 
 ;;;	ld	de,INMS18	; "File(s) erased"
 
-ERA1:	ld	de,ERMS15	; "unable to find file"
+ERA1:	ld	de,ERMS20	; "unable to find file"
 	call	PRTERR
 	jp	KERMIT
 
 ERMS15:	db	'?Unable to find file',0
+ERMS20:	db	'?Unable to delete file',0
 ;;;INMS18:	db	'File(s) erased',0	;;;
 
 ; TYPE - type a file or files to the console.  
@@ -2277,7 +2357,7 @@ ALUN:	ld	e,(hl)		; get device name into DE
 	ld	d,(hl)
 	inc	hl
 	ld	c,(hl)		; get unit number into C
-	SC	.ALUN		; assign LUN
+ALUN1:	SC	.ALUN		; assign LUN
 	ret	c		; on error, return
 	ld	hl,GLUNB	; get buffer address for LUN information
 	ld	c,b		; get LUN into C
@@ -2671,7 +2751,7 @@ IXREAD:	ld	a,h
 DEC24:	ld	a,h		; check low 16-bits before decrement
 	or	l
 	dec	hl		; decrement low word
-	ret	nz		; return if did not warp around
+	ret	nz		; return if did not wrap around
 	dec	b		; else decrement high byte
 	ret			; and we're done
 
@@ -2815,7 +2895,7 @@ INODE:	defs	IESZ		; buffer for index file entry
 
 NFILES:	defs	2		; number of files listed by the DIR command
 CLFACT:	defs	1		; cluster factor
-BMP:	defs	1		; birmap byte
+BMP:	defs	1		; bitmap byte
 CCNT:	defs	3		; cluster count
 NBLKS:	defs	3		; total number blocks on device
 FREBKS:	defs	3		; number of free blocks
