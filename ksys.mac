@@ -2,7 +2,7 @@
 ;       KERMIT - (Celtic for "FREE")
 ;
 ;       This is the RSX180/280 implementation of the Columbia University
-;       KERMIT file transfer protocol. (C) 2021, Hector Peraza.
+;       KERMIT file transfer protocol. (C) 2021-2022, Hector Peraza.
 ;
 ;       Version 4.0
 ;
@@ -20,7 +20,10 @@
 ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Revision history (latest first):
 ;
-; edit 20, 4-Dec-2021 by H. Peraza: fix remote operation (line set to TI:).
+; edit 21, 4-Dec-2021 by H. Peraza: add VFC parameter to QIO blocks as
+;       required by RSX180/280 V6.31 and up.
+;
+; edit 20, 18-May-2022 by H. Peraza: fix remote operation (line set to TI:).
 ;
 ; edit 19, 22-May-2021 by H. Peraza: when selecting a new line, update the
 ;       SPEED variable with the value obtained from device characteristics.
@@ -137,7 +140,7 @@
 
 	.Z80
 
-	ident	/20/
+	ident	/21/
 
 	include	KDEF.INC
 	include	SYSFN.INC
@@ -191,7 +194,7 @@ SFBIT	equ	4		; system file open bit flag
 
 	cseg
 
-SYSVER:	defb	'KSYS (20)  4-Dec-2021',0	; name, edit number, date
+SYSVER:	defb	'KSYS (21) 18-May-2022',0	; name, edit number, date
 
 ; System-dependent initialization
 ; Called once at program start.
@@ -299,7 +302,7 @@ NSEC	equ	NBUF/BUFSIZ	; 8K / number of bytes per sector
 	ld	b,0
 	ld	de,BUFSIZ
 	or	a
-SINIT3:	sbc	hl,de		; see how many disk blocks we can fit
+SINIT3:	sbc	hl,de		; see how many disk blocks we can fit in
 	jr	c,SINIT4
 	inc	b		; count
 	jr	SINIT3		; and loop
@@ -1698,7 +1701,7 @@ ERA:	ld	a,CMIFI		; parse a file-spec
 
 ;;;	ld	de,INMS18	; "File(s) erased"
 
-ERA1:	ld	de,ERMS20	; "unable to find file"
+ERA1:	ld	de,ERMS20	; "unable to delete file"
 	call	PRTERR
 	jp	KERMIT
 
@@ -2795,8 +2798,8 @@ MDMGTC:	QIOW$	SF.GMC,LUNMDM,EFNMD,IOSB,,<MDORIG,10>	; get original settings
 MDMSTC:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDCOMM,8>	; set comm characteristics
 MDMRST:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDORIG,8>	; restore original config
 MDMSPD:	QIOW$	SF.SMC,LUNMDM,EFNMD,IOSB,,<MDSPD,2>	; set line speed
-QIOMRD:	QIOW$	IO.RVB,LUNMDM,EFNMD,ISB,,<IBUF,128,,,,>
-QIOMWR:	QIOW$	IO.WVB,LUNMDM,EFNMD,OSB,,<OBUF,128,,,,>
+QIOMRD:	QIOW$	IO.RVB,LUNMDM,EFNMD,ISB,,<IBUF,128,0,,,>
+QIOMWR:	QIOW$	IO.WVB,LUNMDM,EFNMD,OSB,,<OBUF,128,0,,,>
 QIOMKI:	QIOW$	IO.KIL,LUNMDM,EFNMD,OSB
 MDORIG:	defb	TC.BIN,0	; orig. binary mode
 	defb	TC.NEC,0	; orig. echo mode
@@ -2838,19 +2841,19 @@ IOACR	equ	IO.ACC OR ((SF.ACR OR SF.SHR) SHL 8)
 IOACRW	equ	IO.ACC OR ((SF.ACR OR SF.ACW OR SF.SHR) SHL 8)
 
 QDACC:	QIOW$	IOACR,LUNDIR,EFNFIL,IOSB,,<DFCB>
-QDREAD:	QIOW$	IO.RVB,LUNDIR,EFNFIL,IOSB,,<DIRBF,512,0,0,0>
+QDREAD:	QIOW$	IO.RVB,LUNDIR,EFNFIL,IOSB,,<DIRBF,512,0,0,0,0>
 QDDEA:	QIOW$	IO.DEA,LUNDIR,EFNFIL,IOSB
 
 QFACC:	QIOW$	IOACR,LUNFIL,EFNFIL,IOSB,,<FCB>
 QFRAT:	QIOW$	IO.RAT,LUNFIL,EFNFIL,IOSB,,<FCB,FINFSZ>
-QFRD:	QIOW$	IO.RVB,LUNFIL,EFNFIL,IOSB,,<DIRBF,512,0,0,0>
+QFRD:	QIOW$	IO.RVB,LUNFIL,EFNFIL,IOSB,,<DIRBF,512,0,0,0,0>
 QFDEA:	QIOW$	IO.DEA,LUNFIL,EFNFIL,IOSB
 
 QFCRE:	QIOW$	IO.CRE,LUNFI2,EFNFIL,IOSB,,<FCB2,0,0>
 QFACRW:	QIOW$	IOACRW,LUNFI2,EFNFIL,IOSB,,<FCB2>
 QFRAT2:	QIOW$	IO.RAT,LUNFI2,EFNFIL,IOSB,,<FCB2,FINFSZ>
-QFWR:	QIOW$	IO.WVB,LUNFI2,EFNFIL,IOSB,,<DIRBF,512,0,0,0>
-QFRD2:	QIOW$	IO.RVB,LUNFI2,EFNFIL,IOSB,,<DIRBF,512,0,0,0>
+QFWR:	QIOW$	IO.WVB,LUNFI2,EFNFIL,IOSB,,<DIRBF,512,0,0,0,0>
+QFRD2:	QIOW$	IO.RVB,LUNFI2,EFNFIL,IOSB,,<DIRBF,512,0,0,0,0>
 QFDEA2:	QIOW$	IO.DEA,LUNFI2,EFNFIL,IOSB
 
 QREN:	QIOW$	IO.REN,LUNFIL,EFNFIL,IOSB,,<FCB,FCB2>
@@ -2859,7 +2862,7 @@ QDEL2:	QIOW$	IO.DEL,LUNFI2,EFNFIL,IOSB,,<FCB2>
 
 QTKACC:	QIOW$	IOACR,LUNTAK,EFNFIL,IOSB,,<TAKFCB>
 QTKRAT:	QIOW$	IO.RAT,LUNTAK,EFNFIL,IOSB,,<TAKFCB,FINFSZ>
-QTKRD:	QIOW$	IO.RVB,LUNTAK,EFNFIL,IOSB,,<TAKBUF,512,0,0,0>
+QTKRD:	QIOW$	IO.RVB,LUNTAK,EFNFIL,IOSB,,<TAKBUF,512,0,0,0,0>
 QTKDEA:	QIOW$	IO.DEA,LUNTAK,EFNFIL,IOSB
 
 FOPNFL:	defb	0		; file open flag (bit mask)
@@ -2887,7 +2890,7 @@ BMFCB:	defw	0		; bitmap file FCB
 	defw	0
 
 QSACC:	QIOW$	IOACR,LUNSYS,EFNFIL,IOSB,,<IXFCB>
-QSRD:	QIOW$	IO.RVB,LUNSYS,EFNFIL,IOSB,,<INODE,IESZ,0,0,0>
+QSRD:	QIOW$	IO.RVB,LUNSYS,EFNFIL,IOSB,,<INODE,IESZ,0,0,0,0>
 QSDEA:	QIOW$	IO.DEA,LUNSYS,EFNFIL,IOSB
 
 INUM:	defs	2		; index file entry number
